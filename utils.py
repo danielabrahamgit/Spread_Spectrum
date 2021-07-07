@@ -107,7 +107,6 @@ class MR_utils:
 	def add_PT(self, freq, modulation=None):
 		# Demodulate by center frequency
 		new_freq = freq - self.fc
-		new_freq = 120e3
 		
 		# use signal util to generate a pure tone
 		sig_utils.Fs = self.fs
