@@ -1,6 +1,17 @@
+import nrrd
 import numpy as np
 import matplotlib.pyplot as plt
-from sig_utils import sig_utils
+from utils import sig_utils, MR_utils
+from PIL import Image
+
+
+im = np.array(Image.open('images/brain.png'))
+
+mr = MR_utils(tr=34e-3, bwpp=250e3/256, fc=127.8e6)
+mr.load_image(im)
+mr.add_PT(127.6e6)
+mr.MRshow()
+quit()
 
 F_TONE = 300
 sig_utils.Fs = 1e3
