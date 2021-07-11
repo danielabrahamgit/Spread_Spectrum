@@ -82,19 +82,32 @@ class MR_utils:
 		self.fs = self.ksp.shape[1] * self.BWPP
 	
 	# Display image and kspace
-	def MRshow(self, drng=1e-6):
+	def MRshow(self, drng=1e-6, log=True):
 		# Check that we have images
 		if self.img is None or self.ksp is None:
 			print('Load image first')
 			return
+
+		# Generate subplots
+		fig, (ax1, ax2, ax3) = plt.subplots(ncols=3)
 		
 		# Display kspace (left)
-		plt.subplot(1, 2, 1)
-		plt.imshow(np.log(np.abs(self.ksp) + drng), cmap='gray')
+		ax1.set_title('K-Space')
+		if log:
+			ax1.imshow(np.log(np.abs(self.ksp) + drng), cmap='gray')
+		else:
+			ax1.imshow(np.abs(self.ksp), cmap='gray')
+
+		# Display fft along raeadout (middle)
+		fft_readout = np.fft.fftshift(np.fft.fft(self.ksp, axis=1), axes=1)
+		ax2.set_title(f'FFT Along Readout')
+		ax2.set_xlabel(r'$\frac{\omega}{\pi}$')
+		ax2.imshow(np.abs(fft_readout), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
 
 		# Display image (right)
-		plt.subplot(1, 2, 2)
-		plt.imshow(np.abs(self.img), cmap='gray')
+		ax3.set_title('Acquired Image')
+		ax3.imshow(np.abs(self.img), cmap='gray')
+
 		plt.show()
 
 	# 2DFT and inverse 
@@ -108,22 +121,20 @@ class MR_utils:
 		# Demodulate by center frequency
 		new_freq = freq - self.fc
 		
-		# use signal util to generate a pure tone
+		# Use signal util to generate a pure tone
 		sig_utils.Fs = self.fs
 		n_pe, n_ro = self.ksp.shape
 		_, sig = sig_utils.gen_tone(new_freq, 0, self.TR * n_pe, complex=True)
-		sig *= 1000
-		lst = []
-		
-		# add pilot tone to kspace data 
+		sig *= 10
+
+		# Add pilot tone to kspace data 
 		sample_num = 0
 		for pe in range(n_pe):
-			# FIXME DEFINITELY NEEDS TO BE FIXED, ASK ABOUT PHASE
-			sample_num = np.random.randint(n_pe)#int(self.fs * self.TR) * pe
-			lst.append(sig[sample_num])
+			# Add phase accumulated by waiting until the next readout
+			sample_num += int(self.fs * (self.TR - (1 / self.BWPP)))
 			for ro in range(n_ro):
-				sample_num += 1
 				self.ksp[pe, ro] += sig[sample_num]
+				sample_num += 1
 		
 		# Recalculate image
 		self.img = MR_utils.ifft2c(self.ksp)
