@@ -114,9 +114,20 @@ class MR_utils:
 			new_ksp = self.ksp * prnd_seq
 		else:
 			new_ksp = self.ksp
+
+		# Plots the readout FFTs before and after correlation
+		fft_readout = np.fft.fftshift(np.fft.fft(self.ksp, axis=1), axes=1)
+		plt.subplot(2,1,1)
+		plt.imshow(np.log10(np.abs(fft_readout)), cmap='gray')
+
 		# First we take the K-Space FFT along the readout direction
 		fft_readout = np.fft.fftshift(np.fft.fft(new_ksp, axis=1), axes=1)
 		n_pe, n_ro = new_ksp.shape
+
+		# Plots the readout FFTs before and after correlation
+		plt.subplot(2,1,2)
+		plt.imshow(np.log10(np.abs(fft_readout)), cmap='gray')
+		plt.figure()
 
 		if fpt == None:
 			# Now we search for a strong vertical line corelation
@@ -133,3 +144,26 @@ class MR_utils:
 
 		# Finally exract the motion signal now that we have the index
 		return fft_readout[:, amax]
+
+	# Generates pseudo random sequence
+	def prnd_seq_gen(self, p=None, start_state=None):
+		prnd_seq = []
+		# LFSR
+		if p is None and start_state is not None:
+			target_length = np.prod(self.ksp.shape)
+			while len(prnd_seq) != target_length:
+				next_bit = ((start_state >> 0) ^ (start_state >> 2) ^ (start_state >> 3) ^ (start_state >> 5)) & 1
+				start_state = (next_bit << 16) | (start_state >> 1) 
+				prnd_seq.append(1 - 2 * next_bit)
+		# Binomial
+		elif p is not None and start_state is None:
+			flips = np.random.binomial(1, p, np.prod(self.ksp.shape))
+			one = True
+			for flip in flips:
+				if flip:
+					one = not one
+				prnd_seq.append(1 - 2 * int(one == True))
+		else:
+			return None
+		
+		return prnd_seq
