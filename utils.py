@@ -17,10 +17,18 @@ class MR_utils:
 		# image and kspace of that image
 		self.img = None
 		self.ksp = None
+
+		# PRND sequence for pilot tone
+		self.prnd_seq = None
 	
 	# Load an MR image (image space)
 	def load_image(self, img):
 		self.img = img
+		n = 2
+		zp = np.zeros((img.shape[0], img.shape[1] * n))
+		diff = img.shape[1] * (n - 1)
+		zp[:, diff//2:-diff//2] = img
+		self.ksp = MR_utils.fft2c(zp)
 		self.ksp = MR_utils.fft2c(img)
 		self.fs = self.ksp.shape[1] * self.BWPP
 	
@@ -36,33 +44,45 @@ class MR_utils:
 		if self.img is None or self.ksp is None:
 			print('Load image first')
 			return
+		
 
 		# Generate subplots
-		fig, (ax1, ax2, ax3) = plt.subplots(ncols=3, figsize=(10, 6))
-		
-		# Display kspace (left)
+		fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(ncols=2, nrows=2, figsize=(10, 8))
+
+		# Display kspace (top left)
 		ax1.set_title('K-Space')
 		if log_ksp:
 			ax1.imshow(np.log(np.abs(self.ksp) + drng), cmap='gray')
 		else:
 			ax1.imshow(np.abs(self.ksp), cmap='gray')
-
-		# Display fft along raeadout (middle)
-		fft_readout = np.fft.fftshift(np.fft.fft(self.ksp, axis=1), axes=1)
-		ax2.set_title(f'FFT Along Readout')
-		ax2.set_xlabel(r'$\frac{\omega}{\pi}$')
-		if log_ro:
-			ax2.imshow(np.log10(np.abs(fft_readout)), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
-		else:
-			ax2.imshow(np.abs(fft_readout), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
-		# Display image (right)
-		ax3.set_title('Acquired Image')
+		
+		# Display image (top right)
+		ax2.set_title('Acquired Image')
 		if log_im:
-			ax3.imshow(np.log10(np.abs(self.img)), cmap='gray')
+			ax2.imshow(np.log10(np.abs(self.img)), cmap='gray')
 		else:
-			ax3.imshow(np.abs(self.img), cmap='gray')
+			ax2.imshow(np.abs(self.img), cmap='gray')
 		
 		fig.suptitle(title)
+
+		# Display fft along readout (bottom left)
+		fft_readout = np.fft.fftshift(np.fft.fft(self.ksp, axis=1), axes=1)
+		ax3.set_title(f'FFT Along Readout')
+		ax3.set_xlabel(r'$\frac{\omega}{\pi}$')
+		if log_ro:
+			ax3.imshow(np.log10(np.abs(fft_readout)), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
+		else:
+			ax3.imshow(np.abs(fft_readout), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
+		
+		# Display correlated fft along raeadout (bottom right)
+		new_ksp = self.ksp / np.resize(np.array(self.prnd_seq), self.ksp.shape)
+		fft_readout_corr = np.fft.fftshift(np.fft.fft(new_ksp, axis=1), axes=1)
+		ax4.set_title(f'PRND Correlated FFT Along Readout')
+		ax4.set_xlabel(r'$\frac{\omega}{\pi}$')
+		if log_ro:
+			ax4.imshow(np.log10(np.abs(fft_readout_corr)), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
+		else:
+			ax4.imshow(np.abs(fft_readout_corr), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
 		plt.show()
 
 	# 2DFT and inverse 
@@ -72,13 +92,15 @@ class MR_utils:
 		return np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(F)))
 	
 	# Adds a pure pilot tone to our kspace data
-	def add_PT(self, freq, tr_uncert=0, modulation=None, prnd_seq=None):
+	def add_PT(self, freq, tr_uncert=0, modulation=None):
 		# Number of phase encodes and readouts
 		n_pe, n_ro = self.ksp.shape
 
 		# Keep sequence of ones if no random sequence is selected
-		if prnd_seq is None:
+		if self.prnd_seq is None:
 			prnd_seq = np.ones(n_ro * n_pe)
+		else:
+			prnd_seq = self.prnd_seq
 
 		# Add pilot tone to kspace data 
 		for pe in range(n_pe):
@@ -107,27 +129,17 @@ class MR_utils:
 		return a, b
 
 	# Extracts Motion signal from Pilot Tone
-	def motion_extract(self, fpt=None, prnd_seq=None):
+	def motion_extract(self, fpt=None):
 		# Correct kspace if needed
-		if prnd_seq is not None:
-			prnd_seq = np.resize(np.array(prnd_seq), self.ksp.shape)
-			new_ksp = self.ksp * prnd_seq
+		if self.prnd_seq is not None:
+			prnd_seq = np.resize(np.array(self.prnd_seq), self.ksp.shape)
+			new_ksp = self.ksp / prnd_seq
 		else:
 			new_ksp = self.ksp
-
-		# Plots the readout FFTs before and after correlation
-		fft_readout = np.fft.fftshift(np.fft.fft(self.ksp, axis=1), axes=1)
-		plt.subplot(2,1,1)
-		plt.imshow(np.log10(np.abs(fft_readout)), cmap='gray')
 
 		# First we take the K-Space FFT along the readout direction
 		fft_readout = np.fft.fftshift(np.fft.fft(new_ksp, axis=1), axes=1)
 		n_pe, n_ro = new_ksp.shape
-
-		# Plots the readout FFTs before and after correlation
-		plt.subplot(2,1,2)
-		plt.imshow(np.log10(np.abs(fft_readout)), cmap='gray')
-		plt.figure()
 
 		if fpt == None:
 			# Now we search for a strong vertical line corelation
@@ -142,8 +154,12 @@ class MR_utils:
 		# new_ksp = np.apply_along_axis(lambda m: np.convolve(m, filt, mode='same'), axis=1, arr=self.ksp)
 		# fft_readout = np.fft.fftshift(np.fft.fft(new_ksp, axis=1), axes=1)
 
+
+		# plt.plot(np.real(new_ksp[27, :]))
+		# plt.figure()
+		
 		# Finally exract the motion signal now that we have the index
-		return fft_readout[:, amax]
+		return np.abs(np.mean(new_ksp, axis=1))#fft_readout[:, amax]
 
 	# Generates pseudo random sequence
 	def prnd_seq_gen(self, p=None, start_state=None):
@@ -166,4 +182,4 @@ class MR_utils:
 		else:
 			return None
 		
-		return prnd_seq
+		self.prnd_seq = prnd_seq
