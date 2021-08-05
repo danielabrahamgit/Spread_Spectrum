@@ -22,14 +22,20 @@ mr.load_image(im)
 
 # Motion modulation signal
 def mod(t):
-	return 1e1 * (2 + np.sin(2 * np.pi * t / (50 * mr.TR)))
-
+	return 1e1 #* (2 + np.sin(2 * np.pi * t / (50 * mr.TR)))
+# mod = 20 + 10 * np.sin(2 * np.pi * np.arange(mr.ksp.shape[0]) / (50 * mr.TR * mr.fs))
 # Spread spectrum modulation PRN sequence
-mr.prnd_seq_gen(seq_len=5000)
+mr.prnd_seq_gen(seq_len=10000)
 
 # Add Pilot tone (with modulation) and extract motion + image
 ksp_std = mr.get_ksp_std()
 a, b = mr.add_PT(fpt, tr_uncert=tr_uncert, modulation=mod)
+
+
+plt.plot(np.abs(np.mean(mr.prnd_mat * np.real(mr.ksp), axis=1)))
+plt.plot(mr.true_motion)
+plt.figure()
+
 
 # Plot motion estimates
 motion = mr.motion_extract(fpt=fpt)

@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
 
+
 class MR_utils:
 
 	# Set all global constants on initialization
@@ -128,23 +129,24 @@ class MR_utils:
 			modulation = lambda x : 1
 
 		self.ksp_og = self.ksp.copy()
+		self.prnd_mat = np.zeros(self.ksp.shape)
+		N = len(self.prnd_seq)
 		# Add pilot tone to kspace data 
 		for pe in range(n_pe):
 			phase_accrued = (pe * self.TR)
 			if tr_uncert != 0:
 				phase_accrued *= 1 + (((2 * np.random.rand()) - 1) * tr_uncert)
-			if not matrix:
-				samples_accrued = int(phase_accrued * self.fs)
-				self.prnd_seq = np.roll(self.prnd_seq, samples_accrued)
+			samples_accrued = int(phase_accrued * self.fs)
 			for ro in range(n_ro):
 				t = phase_accrued + ro / self.fs
+				self.prnd_mat[pe,ro] = self.prnd_seq[(samples_accrued + ro) % N]
 				if ro == 0:
 					self.true_motion.append(modulation(t))
 				if matrix:
 					self.ksp[pe, ro] += modulation(t) * np.exp(2j*np.pi*freq*t) * self.prnd_seq[pe, ro]
 				else:
-					self.ksp[pe, ro] += modulation(t) * np.exp(2j*np.pi*freq*t) * self.prnd_seq[ro]
-
+					self.ksp[pe, ro] += modulation(t) * np.exp(2j*np.pi*freq*t) * self.prnd_seq[(samples_accrued + ro) % N]
+		plt.figure()
 		# Recalculate image
 		self.img = MR_utils.ifft2c(self.ksp)
 
@@ -191,9 +193,8 @@ class MR_utils:
 		# Repeating single sequence
 		elif len(self.prnd_seq.shape) == 1:
 			amps = []
-			for ro in self.ksp:
-				amps.append(np.max(np.abs(np.correlate(ro, self.prnd_seq, mode='same'))))
-			plt.figure()
+			for i, ro in enumerate(np.real(self.ksp)):
+				amps.append(np.max(np.correlate(ro, self.prnd_seq, mode='same')))
 			return np.array(amps) / self.ksp.shape[1]
 		# Matrix with many random sequences
 		else:
@@ -285,8 +286,6 @@ class MR_utils:
 		# Pure orthogonal hadmard codes
 		else:
 			self.prnd_seq = 2 * np.random.randint(0, 2, seq_len) - 1
-		
-		print(self.prnd_seq[:20])
 			
 
 	# Plots the standard deviation across each readout
