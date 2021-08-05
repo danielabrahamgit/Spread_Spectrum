@@ -80,17 +80,19 @@ class MR_utils:
 		
 		# Display correlated fft along raeadout (bottom right)
 		if self.prnd_seq is not None:
-			new_ksp = self.ksp / self.prnd_seq
+			if len(self.prnd_seq.shape) == 1:
+				rows = []
+				for ro in self.ksp:
+					rows.append(np.correlate(ro, self.prnd_seq, mode='same'))
+				new_ksp = np.array(rows)
+			else:
+				new_ksp = self.prnd_seq @ self.ksp.T
 		else:
 			new_ksp = self.ksp
-		fft_readout_corr = np.fft.fftshift(np.fft.fft(new_ksp, axis=1), axes=1)
-		ax4.set_title(f'PRND Correlated FFT Along Readout')
-		ax4.set_xlabel(r'$\frac{\omega}{\pi}$')
+		ax4.set_title(f'Log Correlation of Each Readout With PRND Seq')
+		ax4.set_xlabel('Correlation Index')
 		ax4.set_ylabel('Phase Encode #')
-		if log_ro:
-			ax4.imshow(np.log10(np.abs(fft_readout_corr)), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
-		else:
-			ax4.imshow(np.abs(fft_readout_corr), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
+		ax4.imshow(np.log(np.abs(new_ksp)), cmap='gray', aspect=len(self.prnd_seq)/self.ksp.shape[1])
 		plt.show()
 
 	# 2DFT and inverse 
@@ -108,11 +110,22 @@ class MR_utils:
 		# Number of phase encodes and readouts
 		n_pe, n_ro = self.ksp.shape
 
+		# Determine what type of random sequence we are using
+		if len(self.prnd_seq.shape) > 1:
+			matrix = True
+		else:
+			matrix = False
+
 		# Keep sequence of ones if no random sequence is selected
 		if self.prnd_seq is None:
-			prnd_seq = np.ones(n_ro * n_pe)
-		else:
-			prnd_seq = self.prnd_seq.flatten()
+			if matrix:
+				self.prnd_seq = np.ones(self.ksp.shape)
+			else:
+				self.prnd_seq = np.ones(self.ksp.shape[1])
+		
+		# If modulation, just make a function that returns 1
+		if modulation is None:
+			modulation = lambda x : 1
 
 		self.ksp_og = self.ksp.copy()
 		# Add pilot tone to kspace data 
@@ -120,14 +133,17 @@ class MR_utils:
 			phase_accrued = (pe * self.TR)
 			if tr_uncert != 0:
 				phase_accrued *= 1 + (((2 * np.random.rand()) - 1) * tr_uncert)
+			if not matrix:
+				samples_accrued = int(phase_accrued * self.fs)
+				self.prnd_seq = np.roll(self.prnd_seq, samples_accrued)
 			for ro in range(n_ro):
 				t = phase_accrued + ro / self.fs
-				if modulation is None:
-					self.ksp[pe, ro] += np.exp(2j*np.pi*freq*t) * prnd_seq[n_ro * pe + ro]
-				else: 
-					if ro == 0:
-						self.true_motion.append(modulation(t) * np.exp(2j*np.pi*freq*t))
-					self.ksp[pe, ro] += modulation(t) * np.exp(2j*np.pi*freq*t) * prnd_seq[n_ro * pe + ro]
+				if ro == 0:
+					self.true_motion.append(modulation(t))
+				if matrix:
+					self.ksp[pe, ro] += modulation(t) * np.exp(2j*np.pi*freq*t) * self.prnd_seq[pe, ro]
+				else:
+					self.ksp[pe, ro] += modulation(t) * np.exp(2j*np.pi*freq*t) * self.prnd_seq[ro]
 
 		# Recalculate image
 		self.img = MR_utils.ifft2c(self.ksp)
@@ -146,19 +162,7 @@ class MR_utils:
 	# Extracts Motion signal from Pilot Tone
 	def motion_extract(self, fpt=None):
 		
-		# Correct kspace if needed
-		if self.prnd_seq is not None:
-			amps = []
-			for i, ro in enumerate(self.ksp):
-				std = np.std(ro)
-				prnd_seq_ro = self.prnd_seq[i, :]
-				raw_inner_aprox = 0
-				# if std > 100:
-				# 	corr_ish = np.sum(np.conj(ro) * np.delete(self.prnd_seq, i, 0), axis=1)
-				# 	raw_inner_aprox = np.mean(corr_ish)
-				amps.append(np.vdot(ro, 1 / prnd_seq_ro) - raw_inner_aprox)
-			return np.array(amps) / self.ksp.shape[1]
-		else:
+		if self.prnd_seq is None:
 			# First we take the K-Space FFT along the readout direction
 			fft_readout = np.fft.fftshift(np.fft.fft(self.ksp, axis=1), axes=1)
 			n_pe, n_ro = self.ksp.shape
@@ -176,7 +180,6 @@ class MR_utils:
 			# new_ksp = np.apply_along_axis(lambda m: np.convolve(m, filt, mode='same'), axis=1, arr=self.ksp)
 			# fft_readout = np.fft.fftshift(np.fft.fft(new_ksp, axis=1), axes=1)
 
-
 			# plt.plot(np.real(new_ksp[27, :]))
 			# plt.figure()
 			
@@ -185,6 +188,25 @@ class MR_utils:
 			# self.ksp -= np.resize(np.repeat(motion_sig, self.ksp.shape[1]), self.ksp.shape) * self.prnd_seq
 			# self.img = MR_utils.ifft2c(self.ksp)
 			return motion_sig
+		# Repeating single sequence
+		elif len(self.prnd_seq.shape) == 1:
+			amps = []
+			for ro in self.ksp:
+				amps.append(np.max(np.abs(np.correlate(ro, self.prnd_seq, mode='same'))))
+			plt.figure()
+			return np.array(amps) / self.ksp.shape[1]
+		# Matrix with many random sequences
+		else:
+			amps = []
+			for i, ro in enumerate(self.ksp):
+				std = np.std(ro)
+				prnd_seq_ro = self.prnd_seq[i, :]
+				raw_inner_aprox = 0
+				# if std > 100:
+				# 	corr_ish = np.sum(np.conj(ro) * np.delete(self.prnd_seq, i, 0), axis=1)
+				# 	raw_inner_aprox = np.mean(corr_ish)
+				amps.append(np.vdot(ro, 1 / prnd_seq_ro) - raw_inner_aprox)
+			return np.array(amps) / self.ksp.shape[1]
 	
 	# Generates purely orthogonal codes
 	def hadamard(n):
@@ -223,11 +245,11 @@ class MR_utils:
 		return np.array(nums)
 
 	# Generates pseudo random sequence
-	def prnd_seq_gen(self, p=None, start_state=None, odd=False):
+	def prnd_mat_gen(self, p=None, start_state=None):
 		prnd_seq = []
 		# LFSR
 		if p is None and start_state is not None:
-			prnd_seq = self.lfsr_gen(lfsr=start_state)
+			prnd_seq = self.lfsr_gen(lfsr=start_state)[0,:]
 		# Binomial
 		elif p is not None and start_state is None:
 			flips = np.random.binomial(1, p, np.prod(self.ksp.shape))
@@ -242,6 +264,30 @@ class MR_utils:
 			prnd_seq = MR_utils.hadamard(self.ksp.shape[1])
 		
 		self.prnd_seq = prnd_seq
+	
+	# Generates a single sequence that will repeat itself
+	def prnd_seq_gen(self, p=None, start_state=None, seq_len=None):
+		if seq_len is None:
+			seq_len = self.ksp.shape[1]
+		prnd_seq = []
+		# LFSR
+		if p is None and start_state is not None:
+			self.prnd_seq = self.lfsr_gen(lfsr=start_state).flatten()[:seq_len]
+		# Binomial
+		elif p is not None and start_state is None:
+			flips = np.random.binomial(1, p, seq_len)
+			one = True
+			for flip in flips:
+				if flip:
+					one = not one
+				prnd_seq.append(1 - 2 * int(one == True))
+			self.prnd_seq = np.array(prnd_seq)
+		# Pure orthogonal hadmard codes
+		else:
+			self.prnd_seq = 2 * np.random.randint(0, 2, seq_len) - 1
+		
+		print(self.prnd_seq[:20])
+			
 
 	# Plots the standard deviation across each readout
 	def get_ksp_std(self):
