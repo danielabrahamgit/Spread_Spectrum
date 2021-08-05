@@ -28,7 +28,30 @@ def mod(t):
 	return 1e1 * (2 + np.sin(2 * np.pi * t / (50 * mr.TR)))
 
 # Spread spectrum modulation PRN sequence
-mr.prnd_seq_gen(p=0.5)
+mr.prnd_seq_gen()
+
+# # Play with correlation
+# ksp = np.real(mr.ksp)
+# cor = np.abs(mr.prnd_seq @ ksp.T)
+# l2 = np.mean(cor ** 2, axis=1)
+# l1 = np.mean(cor, axis=1)
+# mx = np.max(cor, axis=1)
+
+# lin_comb = l1 + l2 + mx
+# min_ind, min_val = np.argmin(lin_comb), np.min(lin_comb)
+# print(min_ind, min_val)
+# plt.figure()
+# with open('scratch.txt', 'w') as f:
+# 	f.write('np.array([')	
+# 	for v in mr.prnd_seq[min_ind, :][:-1]:
+# 		f.write(str(v) + ', ')
+# 	f.write(str(mr.prnd_seq[min_ind, -1]) + '])')
+
+# plt.plot(np.abs(np.fft.fftshift(np.fft.fft(mr.prnd_seq[min_ind, :]))))
+# plt.figure()
+# plt.imshow(np.log(cor))
+# plt.show()
+# quit()
 
 # Add Pilot tone (with modulation) and extract motion + image
 ksp_std = mr.get_ksp_std()
