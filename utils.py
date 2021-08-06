@@ -248,13 +248,7 @@ class MR_utils:
 			self.prnd_seq = sig_utils.lfsr_gen(seq_len, lfsr=start_state)
 		# Binomial
 		elif p is not None and start_state is None:
-			flips = np.random.binomial(1, p, seq_len)
-			one = True
-			for flip in flips:
-				if flip:
-					one = not one
-				prnd_seq.append(1 - 2 * int(one == True))
-			self.prnd_seq = np.array(prnd_seq)
+			self.prnd_seq = 2 * np.random.binomial(1, p, seq_len) - 1
 		# Pure orthogonal hadmard codes
 		else:
 			self.prnd_seq = 2 * np.random.randint(0, 2, seq_len) - 1
