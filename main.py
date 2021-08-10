@@ -30,7 +30,7 @@ args = parser.parse_args()
 
 # Uncertanty in TR
 if args.tr_rnd:
-	tr_uncert = 0.001
+	tr_uncert = 0.005
 else:
 	tr_uncert = 0
 # Pilot tone frequency
@@ -51,18 +51,11 @@ mr.load_image(im)
 
 # Motion modulation signal
 def mod(t):
-	return 5 * (2 + np.sin(2 * np.pi * t / (50 * mr.TR)))
+	return 40 * (1 + 0.5 * np.sin(2 * np.pi * t / (50 * mr.TR)))
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
 	mr.prnd_seq_gen(p=0.5, seq_len=mr.ksp.shape[1])
-
-ws = np.linspace(-1, 1, len(mr.prnd_seq))
-plt.plot(ws, np.abs(np.fft.fftshift(np.fft.fft(mr.prnd_seq))))
-plt.ylabel('LFSR FFT Magnitude')
-plt.xlabel(r'$\frac{\omega}{\pi}$')
-plt.show()
-quit()
 
 # Get k-sapce std before adding the PT
 ksp_std = mr.get_ksp_std()
