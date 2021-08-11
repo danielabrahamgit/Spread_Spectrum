@@ -7,7 +7,7 @@ from PIL import Image
 # Argument parser
 parser = argparse.ArgumentParser(description='Standard and Spread Spectrum Pilot Tone Simulator. \
 	See https://github.com/danielabrahamgit/Spread_Spectrum for documentation.')
-parser.add_argument('-fpt', metavar='fpt', type=float, default=120e3,
+parser.add_argument('-fpt', metavar='fpt', type=float, default=120,
 					help='The standard pilot tone frequency \
 							(assumes no SSM) (kHz). Default = 120kHz')
 parser.add_argument('--ssm', action='store_true',
@@ -16,13 +16,13 @@ parser.add_argument('--ssm', action='store_true',
 parser.add_argument('--tr_rnd', action='store_true',
 					help='Do you want to enable uncertainty in TR? \
 						Default = False')
-parser.add_argument('-tr', metavar='tr', type=float, default=34e-3,
+parser.add_argument('-tr', metavar='tr', type=float, default=34,
 					help='Time repetition (TR): Time between readouts (ms). \
 						Default = 34ms')
-parser.add_argument('-bw', metavar='bw', type=float, default=250e3,
+parser.add_argument('-bw', metavar='bw', type=float, default=250,
 					help='Bandwidth: Range of frequencies in imaging band (kHz). \
 						Default = 250kHz')
-parser.add_argument('-fc', metavar='fc', type=float, default=127.8e6,
+parser.add_argument('-fc', metavar='fc', type=float, default=127.8,
 					help='Center frequency of scanner (MHz). \
 						Default = 127.8MHz')
 args = parser.parse_args()
@@ -30,21 +30,21 @@ args = parser.parse_args()
 
 # Uncertanty in TR
 if args.tr_rnd:
-	tr_uncert = 0.005
+	tr_uncert = 0.001
 else:
 	tr_uncert = 0
 # Pilot tone frequency
 if args.ssm:
 	fpt = 0
 else:
-	fpt = args.fpt
+	fpt = args.fpt * 1e3
 
 # Load MR image
 # im = np.array(Image.open('images/brain.png'))
 im = np.load('images/brain.npz')['im']
 
 # Initialize MR object with the parameters below
-mr = MR_utils(tr=args.tr, bwpp=args.bw/max(im.shape), fc=args.fc)
+mr = MR_utils(tr=args.tr * 1e-3, bwpp=args.bw * 1e3/max(im.shape), fc=args.fc * 1e6)
 
 # Load Data into MR object
 mr.load_image(im)
