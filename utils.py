@@ -6,7 +6,8 @@ class sig_utils:
 
 	# My circular cross correlation
 	def my_cor(x, y):
-		return np.fft.ifft(np.fft.fft(x) * np.fft.fft(y).conj()).real
+		N = max(len(x), len(y))
+		return np.fft.ifft(np.fft.fft(x, n=N) * np.fft.fft(y, n=N).conj()).real
 
 
 	# 2DFT and inverse 
