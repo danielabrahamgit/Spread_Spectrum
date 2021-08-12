@@ -4,24 +4,10 @@ from math import ceil
 
 class sig_utils:
 
-	# My circular correlation function
-	# Returns the max index and corelation array
+	# My circular cross correlation
 	def my_cor(x, y):
-		# Zero-pad if needed
-		if len(x) > len(y):
-			y = np.concatenate((y, np.zeros(len(x) - len(y))))
-		elif len(y) > len(x):
-			x = np.concatenate((x, np.zeros(len(y) - len(x))))
-		
-		# Length of signal
-		N = len(x)
+		return np.fft.ifft(np.fft.fft(x) * np.fft.fft(y).conj()).real
 
-		# Compute correlation <CAN OPTIMIZE>
-		cors = []
-		for k in range(N):
-			cors.append(np.dot(x, np.roll(y, k)))
-		cors = np.array(cors)
-		return np.argmax(cors), cors
 
 	# 2DFT and inverse 
 	def fft2c(f, shp=None):
@@ -145,7 +131,7 @@ class MR_utils:
 			ax4.set_title('Auto-Correlation of RND Sequence')
 			ax4.set_xlabel('Correlation Index')
 			ax4.set_ylabel('Auto-Correlation')
-			_, auto = sig_utils.my_cor(self.prnd_seq, self.prnd_seq)
+			auto = sig_utils.my_cor(self.prnd_seq, self.prnd_seq)
 			inds = np.arange(-len(auto)//2, len(auto)//2) 
 			ax4.plot(inds, np.fft.fftshift(auto))
 		# Regular Pilot Tone
@@ -240,11 +226,9 @@ class MR_utils:
 			amps = []
 			N = self.ksp.shape[1]
 			for i, ro in enumerate(np.real(self.ksp)):
-				amax, cors = sig_utils.my_cor(ro, self.prnd_seq)
-				est = cors[amax] / N
-				allbut = np.delete(cors, amax)
-				std = np.std(allbut) / N
-				amps.append(est - (std * int(std > 0.9)))
+				cor = sig_utils.my_cor(ro, self.prnd_seq)
+				est = np.max(cor) / N
+				amps.append(est)
 			amps = np.array(amps)
 			return amps
 	

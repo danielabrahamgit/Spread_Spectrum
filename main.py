@@ -63,23 +63,6 @@ ksp_std = mr.get_ksp_std()
 # Add Pilot tone (with modulation) and extract motion + image
 a, b = mr.add_PT(fpt, tr_uncert=tr_uncert, modulation=mod)
 
-# Play around
-# ksp = np.real(mr.ksp)
-# N = mr.ksp.shape[1]
-# for i, ro in enumerate(ksp):
-# 	mx, corr = sig_utils.my_cor(ro, mr.prnd_seq)
-# 	mx_ind = np.argmax(corr)
-# 	allbut = np.delete(corr, mx_ind)
-# 	std = np.std(allbut)
-# 	if i == N//2 - 5:
-# 		plt.plot(corr / N)
-# 		plt.axhline(y=mx / N, color='r', label='niave')
-# 		plt.axhline(y=mr.true_motion[i], color='g', label='true')
-# 		plt.axhline(y=(mx - std) / N, color='magenta', label='smart')
-# plt.legend()
-# plt.show()
-# quit()
-
 # Plot motion estimates
 motion = np.abs(mr.motion_extract(fpt=fpt))
 true_motion = mr.true_motion
