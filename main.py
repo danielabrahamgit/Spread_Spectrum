@@ -68,8 +68,8 @@ motion = np.abs(mr.motion_extract(fpt=fpt))
 true_motion = mr.true_motion
 
 # Print L1 and L2 errors
-print('L1:', np.sum(np.abs(motion - true_motion)) / mr.ksp.shape[0])
-print('L2:', np.sum((motion - true_motion) ** 2) / mr.ksp.shape[0])
+print('M(abs)E:', np.sum(np.abs(motion - true_motion)) / mr.ksp.shape[0])
+print('MSE:', np.sum((motion - true_motion) ** 2) / mr.ksp.shape[0])
 
 # Showcase effect of k-space standard deviation 
 # on the inner product method

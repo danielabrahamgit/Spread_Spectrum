@@ -9,7 +9,6 @@ class sig_utils:
 		N = max(len(x), len(y))
 		return np.fft.ifft(np.fft.fft(x, n=N) * np.fft.fft(y, n=N).conj()).real
 
-
 	# 2DFT and inverse 
 	def fft2c(f, shp=None):
 		if shp == None:
@@ -18,8 +17,7 @@ class sig_utils:
 	def ifft2c(F, shp=None):
 		if shp == None:
 			shp = F.shape
-		return np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(F), s=shp))
-	
+		return np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(F), s=shp))	
 
 	# Generates purely orthogonal codes
 	def hadamard(n):
