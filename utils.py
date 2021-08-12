@@ -5,7 +5,7 @@ from math import ceil
 class sig_utils:
 
 	# My circular correlation function
-	# Returns the max value and corelation array
+	# Returns the max index and corelation array
 	def my_cor(x, y):
 		# Zero-pad if needed
 		if len(x) > len(y):
@@ -21,7 +21,7 @@ class sig_utils:
 		for k in range(N):
 			cors.append(np.dot(x, np.roll(y, k)))
 		cors = np.array(cors)
-		return np.max(cors), cors
+		return np.argmax(cors), cors
 
 	# 2DFT and inverse 
 	def fft2c(f, shp=None):
@@ -82,6 +82,9 @@ class MR_utils:
 		# image and kspace of that image
 		self.img = None
 		self.ksp = None
+
+		# For debuging
+		self.ksp_og = None
 
 		# PRND sequence for pilot tone
 		self.prnd_seq = None
@@ -193,6 +196,9 @@ class MR_utils:
 		if modulation is None:
 			modulation = lambda x : 1
 
+		# For debugging
+		self.ksp_og = self.ksp.copy()
+
 		N = len(prnd_seq)
 		# Add pilot tone to kspace data 
 		for pe in range(n_pe):
@@ -232,9 +238,13 @@ class MR_utils:
 		# Spread Spectrum procedure
 		else:
 			amps = []
+			N = self.ksp.shape[1]
 			for i, ro in enumerate(np.real(self.ksp)):
-				max, cors = sig_utils.my_cor(ro, self.prnd_seq)
-				amps.append(max / self.ksp.shape[1])
+				amax, cors = sig_utils.my_cor(ro, self.prnd_seq)
+				est = cors[amax] / N
+				allbut = np.delete(cors, amax)
+				std = np.std(allbut) / N
+				amps.append(est - (std * int(std > 0.9)))
 			amps = np.array(amps)
 			return amps
 	

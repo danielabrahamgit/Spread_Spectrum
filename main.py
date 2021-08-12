@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import MR_utils
+from utils import MR_utils, sig_utils
 from PIL import Image
 
 # Argument parser
@@ -51,7 +51,7 @@ mr.load_image(im)
 
 # Motion modulation signal
 def mod(t):
-	return 40 * (1 + 0.5 * np.sin(2 * np.pi * t / (50 * mr.TR)))
+	return 10 * (1 + 0.5 * np.sin(2 * np.pi * t / (50 * mr.TR)))
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
@@ -63,9 +63,30 @@ ksp_std = mr.get_ksp_std()
 # Add Pilot tone (with modulation) and extract motion + image
 a, b = mr.add_PT(fpt, tr_uncert=tr_uncert, modulation=mod)
 
+# Play around
+# ksp = np.real(mr.ksp)
+# N = mr.ksp.shape[1]
+# for i, ro in enumerate(ksp):
+# 	mx, corr = sig_utils.my_cor(ro, mr.prnd_seq)
+# 	mx_ind = np.argmax(corr)
+# 	allbut = np.delete(corr, mx_ind)
+# 	std = np.std(allbut)
+# 	if i == N//2 - 5:
+# 		plt.plot(corr / N)
+# 		plt.axhline(y=mx / N, color='r', label='niave')
+# 		plt.axhline(y=mr.true_motion[i], color='g', label='true')
+# 		plt.axhline(y=(mx - std) / N, color='magenta', label='smart')
+# plt.legend()
+# plt.show()
+# quit()
+
 # Plot motion estimates
-motion = mr.motion_extract(fpt=fpt)
+motion = np.abs(mr.motion_extract(fpt=fpt))
 true_motion = mr.true_motion
+
+# Print L1 and L2 errors
+print('L1:', np.sum(np.abs(motion - true_motion)) / mr.ksp.shape[0])
+print('L2:', np.sum((motion - true_motion) ** 2) / mr.ksp.shape[0])
 
 # Showcase effect of k-space standard deviation 
 # on the inner product method
