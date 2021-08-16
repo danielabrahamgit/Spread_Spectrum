@@ -51,7 +51,7 @@ mr.load_image(im)
 
 # Motion modulation signal
 def mod(t):
-	return 10 * (1 + 0.5 * np.sin(2 * np.pi * t / (50 * mr.TR)))
+	return 30 * (1 + 0.5 * np.sin(2 * np.pi * t / (50 * mr.TR)))
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
