@@ -7,7 +7,7 @@ from PIL import Image
 # Argument parser
 parser = argparse.ArgumentParser(description='Standard and Spread Spectrum Pilot Tone Simulator. \
 	See https://github.com/danielabrahamgit/Spread_Spectrum for documentation.')
-parser.add_argument('-fpt', metavar='fpt', type=float, default=120,
+parser.add_argument('-fpt', metavar='fpt', type=float, default=0,
 					help='The standard pilot tone frequency \
 							(assumes no SSM) (kHz). Default = 120kHz')
 parser.add_argument('--ssm', action='store_true',
@@ -34,10 +34,7 @@ if args.tr_rnd:
 else:
 	tr_uncert = 0
 # Pilot tone frequency
-if args.ssm:
-	fpt = 0
-else:
-	fpt = args.fpt * 1e3
+fpt = args.fpt * 1e3
 
 # Load MR image
 # im = np.array(Image.open('images/brain.png'))
@@ -55,13 +52,40 @@ def mod(t):
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
-	mr.prnd_seq_gen(p=0.5, seq_len=mr.ksp.shape[1] * 5)
+	mr.prnd_seq_gen(p=0.5, seq_len=mr.ksp.shape[1])
 
 # Get k-sapce std before adding the PT
 ksp_std = mr.get_ksp_std()
 
 # Add Pilot tone (with modulation) and extract motion + image
 a, b = mr.add_PT(fpt, tr_uncert=tr_uncert, modulation=mod)
+
+# # Play (not sure?)
+# ksp = mr.ksp
+# amps = []
+# for i, ro in enumerate(ksp):
+# 	N = len(ro)
+# 	mxs = []
+# 	for i in range(len(mr.prnd_seq)):
+# 		new_rnd = np.roll(mr.prnd_seq, i)
+# 		mxs.append(np.max(np.abs(np.fft.fft(ro * new_rnd))) / N)
+# 	amps.append(np.max(mxs))
+# plt.plot(amps)
+# plt.plot(mr.true_motion)
+# plt.show()
+# quit()
+
+# Play
+prnd = mr.prnd_seq
+prnd_shift = np.roll(prnd, np.random.randint(len(prnd)))
+P = np.fft.fftshift(np.fft.fft(prnd))
+P_shift = np.fft.fftshift(np.fft.fft(prnd_shift))
+plt.subplot(2,1,1)
+plt.plot(np.abs(P))
+plt.subplot(2,1,2)
+plt.plot(np.abs(P_shift))
+plt.show()
+quit()
 
 # Plot motion estimates
 motion = np.abs(mr.motion_extract(fpt=fpt))
