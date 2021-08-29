@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser(description='Standard and Spread Spectrum Pilot
 	See https://github.com/danielabrahamgit/Spread_Spectrum for documentation.')
 parser.add_argument('-fpt', metavar='fpt', type=float, default=0,
 					help='The standard pilot tone frequency \
-							(assumes no SSM) (kHz). Default = 120kHz')
+							(assumes no SSM) (kHz). Default = 0kHz')
 parser.add_argument('--ssm', action='store_true',
 					help='Do you want to enable spread spectrum? \
 						Default = False')
@@ -19,14 +19,13 @@ parser.add_argument('--tr_rnd', action='store_true',
 parser.add_argument('-tr', metavar='tr', type=float, default=34,
 					help='Time repetition (TR): Time between readouts (ms). \
 						Default = 34ms')
-parser.add_argument('-bw', metavar='bw', type=float, default=250,
-					help='Bandwidth: Range of frequencies in imaging band (kHz). \
+parser.add_argument('-pt_bw', metavar='bw', type=float, default=250,
+					help='Bandwidth of Pilot Tone: Range of frequencies in imaging band (kHz). \
+						Default = imaging bandwidth')
+parser.add_argument('-im_bw', metavar='bw', type=float, default=250,
+					help='Bandwidth of Pilot Tone: Range of frequencies in imaging band (kHz). \
 						Default = 250kHz')
-parser.add_argument('-fc', metavar='fc', type=float, default=127.8,
-					help='Center frequency of scanner (MHz). \
-						Default = 127.8MHz')
 args = parser.parse_args()
-
 
 # Uncertanty in TR
 if args.tr_rnd:
@@ -41,7 +40,7 @@ fpt = args.fpt * 1e3
 im = np.load('images/brain.npz')['im']
 
 # Initialize MR object with the parameters below
-mr = MR_utils(tr=args.tr * 1e-3, bwpp=args.bw * 1e3/max(im.shape), fc=args.fc * 1e6)
+mr = MR_utils(tr=args.tr * 1e-3, bwpp=args.im_bw * 1e3/max(im.shape))
 
 # Load Data into MR object
 mr.load_image(im)
@@ -58,34 +57,34 @@ if args.ssm:
 ksp_std = mr.get_ksp_std()
 
 # Add Pilot tone (with modulation) and extract motion + image
-a, b = mr.add_PT(fpt, tr_uncert=tr_uncert, modulation=mod)
+a, b = mr.add_PT(fpt, args.pt_bw, tr_uncert=tr_uncert, modulation=mod)
 
-# # Play (not sure?)
-# ksp = mr.ksp
-# amps = []
-# for i, ro in enumerate(ksp):
-# 	N = len(ro)
-# 	mxs = []
-# 	for i in range(len(mr.prnd_seq)):
-# 		new_rnd = np.roll(mr.prnd_seq, i)
-# 		mxs.append(np.max(np.abs(np.fft.fft(ro * new_rnd))) / N)
-# 	amps.append(np.max(mxs))
-# plt.plot(amps)
-# plt.plot(mr.true_motion)
+# # # Play (not sure?)
+# # ksp = mr.ksp
+# # amps = []
+# # for i, ro in enumerate(ksp):
+# # 	N = len(ro)
+# # 	mxs = []
+# # 	for i in range(len(mr.prnd_seq)):
+# # 		new_rnd = np.roll(mr.prnd_seq, i)
+# # 		mxs.append(np.max(np.abs(np.fft.fft(ro * new_rnd))) / N)
+# # 	amps.append(np.max(mxs))
+# # plt.plot(amps)
+# # plt.plot(mr.true_motion)
+# # plt.show()
+# # quit()
+
+# # Play
+# prnd = mr.prnd_seq
+# prnd_shift = np.roll(prnd, np.random.randint(len(prnd)))
+# P = np.fft.fftshift(np.fft.fft(prnd))
+# P_shift = np.fft.fftshift(np.fft.fft(prnd_shift))
+# plt.subplot(2,1,1)
+# plt.plot(np.abs(P))
+# plt.subplot(2,1,2)
+# plt.plot(np.abs(P_shift))
 # plt.show()
 # quit()
-
-# Play
-prnd = mr.prnd_seq
-prnd_shift = np.roll(prnd, np.random.randint(len(prnd)))
-P = np.fft.fftshift(np.fft.fft(prnd))
-P_shift = np.fft.fftshift(np.fft.fft(prnd_shift))
-plt.subplot(2,1,1)
-plt.plot(np.abs(P))
-plt.subplot(2,1,2)
-plt.plot(np.abs(P_shift))
-plt.show()
-quit()
 
 # Plot motion estimates
 motion = np.abs(mr.motion_extract(fpt=fpt))

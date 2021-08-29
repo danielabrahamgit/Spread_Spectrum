@@ -55,13 +55,12 @@ class sig_utils:
 
 class MR_utils:
 	# Set all global constants on initialization
-	def __init__(self, tr=0, bwpp=0, fc=127.8e6):	
+	def __init__(self, tr=0, bwpp=0):	
 		# Timing parameters
 		self.TR  = tr
 		self.BWPP = bwpp
 
 		# Frequencies
-		self.fc = fc
 		self.fs = None # Will be calculated soon
 
 		# image and kspace of that image
