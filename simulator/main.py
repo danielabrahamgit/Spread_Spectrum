@@ -25,6 +25,9 @@ parser.add_argument('-pt_bw', metavar='bw', type=float, default=250,
 parser.add_argument('-im_bw', metavar='bw', type=float, default=250,
 					help='Bandwidth of Pilot Tone: Range of frequencies in imaging band (kHz). \
 						Default = 250kHz')
+parser.add_argument('-pt_amp', metavar='bw', type=float, default=20,
+					help='Dimensionless unit of amplitude for the pilot tone. \
+						Default = 20')
 args = parser.parse_args()
 
 # Uncertanty in TR
@@ -37,7 +40,7 @@ fpt = args.fpt * 1e3
 
 # Load MR image
 # im = np.array(Image.open('images/brain.png'))
-im = np.load('images/brain.npz')['im']
+im = np.load('../images/brain.npz')['im']
 
 # Initialize MR object with the parameters below
 mr = MR_utils(tr=args.tr * 1e-3, bwpp=args.im_bw * 1e3/max(im.shape))
@@ -47,17 +50,17 @@ mr.load_image(im)
 
 # Motion modulation signal
 def mod(t):
-	return 30 * (1 + 0.5 * np.sin(2 * np.pi * t / (50 * mr.TR)))
+	return args.pt_amp * (1 + 0.5 * np.sin(2 * np.pi * t / (50 * mr.TR)))
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
-	mr.prnd_seq_gen(p=0.5, seq_len=mr.ksp.shape[1])
+	mr.prnd_seq_gen(p=0.5, seq_len=mr.ksp.shape[1] * 8)
 
 # Get k-sapce std before adding the PT
 ksp_std = mr.get_ksp_std()
 
 # Add Pilot tone (with modulation) and extract motion + image
-a, b = mr.add_PT(fpt, args.pt_bw, tr_uncert=tr_uncert, modulation=mod)
+a, b = mr.add_PT(fpt, tr_uncert=tr_uncert, modulation=mod)
 
 # # # Play (not sure?)
 # # ksp = mr.ksp
@@ -94,9 +97,12 @@ true_motion = mr.true_motion
 print('M(abs)E:', np.sum(np.abs(motion - true_motion)) / mr.ksp.shape[0])
 print('MSE:', np.sum((motion - true_motion) ** 2) / mr.ksp.shape[0])
 
+# Show PSNR
+print(f'SNR(dB): {10 * np.log10(mr.P_ksp / mr.P_pt)}')
+
 # Showcase effect of k-space standard deviation 
 # on the inner product method
-if args.ssm:
+if False:
 	plt.subplot(2,1,1)
 	plt.title('Standard Deviation of Each Readout')
 	plt.xlabel('Phase Encode #')

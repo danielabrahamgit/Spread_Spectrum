@@ -63,6 +63,10 @@ class MR_utils:
 		# Frequencies
 		self.fs = None # Will be calculated soon
 
+		# PT and image power levels
+		self.P_pt = -1
+		self.P_ksp = -1
+
 		# image and kspace of that image
 		self.img = None
 		self.ksp = None
@@ -192,9 +196,12 @@ class MR_utils:
 			samples_accrued = int(phase_accrued * self.fs)
 			for ro in range(n_ro):
 				t = phase_accrued + ro / self.fs
+				pt_addition = modulation(t) * np.exp(2j*np.pi*freq*t) * prnd_seq[(samples_accrued + ro) % N]
+				self.P_pt += np.abs(pt_addition) ** 2
+				self.P_ksp += np.abs(self.ksp[pe,ro]) ** 2
 				if ro == 0:
 					self.true_motion.append(modulation(t))
-				self.ksp[pe, ro] += modulation(t) * np.exp(2j*np.pi*freq*t) * prnd_seq[(samples_accrued + ro) % N]
+				self.ksp[pe, ro] += pt_addition
 		
 		# Recalculate image
 		self.img = sig_utils.ifft2c(self.ksp)
