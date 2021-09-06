@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from math import ceil
+from scipy import signal
 
 class sig_utils:
 
@@ -55,13 +56,14 @@ class sig_utils:
 
 class MR_utils:
 	# Set all global constants on initialization
-	def __init__(self, tr=0, bwpp=0):	
+	def __init__(self, tr=0, bwpp=0, pt_bw=None):	
 		# Timing parameters
 		self.TR  = tr
 		self.BWPP = bwpp
 
 		# Frequencies
 		self.fs = None # Will be calculated soon
+		self.fs_pt = pt_bw
 
 		# PT and image power levels
 		self.P_pt = -1
@@ -85,12 +87,16 @@ class MR_utils:
 		self.img = img
 		self.ksp = sig_utils.fft2c(img)
 		self.fs = self.ksp.shape[1] * self.BWPP
+		if self.fs_pt is None:
+			self.fs_pt = self.fs
 	
 	# Load a K-space image
 	def load_kspace(self, ksp):
 		self.img = sig_utils.ifft2c(ksp)
 		self.ksp = ksp
 		self.fs = self.ksp.shape[1] * self.BWPP
+		if self.fs_pt is None:
+			self.fs_pt = self.fs
 	
 	# Display image and kspace
 	def MRshow(self, drng=1e-6, log_ksp=True, log_ro=False, log_im=False, title=''):
@@ -176,32 +182,58 @@ class MR_utils:
 
 		# Keep sequence of ones if no random sequence is selected
 		if self.prnd_seq is None:
-			prnd_seq = np.ones(self.ksp.shape[1])
+			prnd_seq = np.ones(self.ksp.shape[1] * 2)
 		else:
 			prnd_seq = self.prnd_seq
 		
-		# If modulation, just make a function that returns 1
+		# If no modulation, just make a function that returns 1
 		if modulation is None:
 			modulation = lambda x : 1
 
 		# For debugging
 		self.ksp_og = self.ksp.copy()
+		
+		# Time of readout in seconds
+		t_readout = 1 / self.BWPP
 
-		N = len(prnd_seq)
-		# Add pilot tone to kspace data 
+		# Time axis for PT device
+		pt_device_time = np.arange(0, t_readout, 1/self.fs_pt)
+		N_pt_ro = len(pt_device_time)
+
+		# Add pilot tone to kspace data for readout
 		for pe in range(n_pe):
-			phase_accrued = (pe * self.TR)
+			# Time passed from start of scan
+			time_accrued = (pe * self.TR)
+
+			# Factor in uncertanty in TR
 			if tr_uncert != 0:
-				phase_accrued *= 1 + (((2 * np.random.rand()) - 1) * tr_uncert)
-			samples_accrued = int(phase_accrued * self.fs)
-			for ro in range(n_ro):
-				t = phase_accrued + ro / self.fs
-				pt_addition = modulation(t) * np.exp(2j*np.pi*freq*t) * prnd_seq[(samples_accrued + ro) % N]
-				self.P_pt += np.abs(pt_addition) ** 2
-				self.P_ksp += np.abs(self.ksp[pe,ro]) ** 2
-				if ro == 0:
-					self.true_motion.append(modulation(t))
-				self.ksp[pe, ro] += pt_addition
+				time_accrued *= 1 + (((2 * np.random.rand()) - 1) * tr_uncert)
+			
+			# Accrue time 
+			pt_device_time += time_accrued
+
+			# Phase accrued bewtween TRs
+			pt_device_samples_accrued = int(time_accrued * self.fs_pt)
+
+			# Since we accrued phase, grab correct shifted random sequence
+			prnd_seq_adjusted = np.roll(prnd_seq, -(pt_device_samples_accrued % len(prnd_seq)))
+			
+			# Device signal is then modulation * pilot tone * rnd sequence
+			pt_sig_device = modulation(time_accrued) * np.exp(2j*np.pi*freq*pt_device_time) * prnd_seq_adjusted[:N_pt_ro]
+
+			# The scanner receivess a resampled version of the original PT signal due to 
+			# a mismatch in the sacnner BW and the PT device BW
+			pt_sig_scanner = signal.resample(pt_sig_device, n_ro)
+
+			# Keep track of the power levels of the pilot tone and raw readout speraately
+			self.P_pt += np.sum(np.abs(pt_sig_scanner) ** 2)
+			self.P_ksp += np.sum(np.abs(self.ksp[pe,:]) ** 2)
+
+			# Add pilot tone to the scanner
+			self.ksp[pe,:] += pt_sig_scanner
+
+			# Keep track of the true modulation signal, for later
+			self.true_motion.append(modulation(time_accrued))
 		
 		# Recalculate image
 		self.img = sig_utils.ifft2c(self.ksp)
@@ -214,6 +246,7 @@ class MR_utils:
 		val = freq * self.TR
 		alpha = np.round(val) - val
 		a = np.round(n_pe/2 + alpha * n_pe)
+		plt.show()
 
 		return a, b
 
@@ -229,13 +262,14 @@ class MR_utils:
 		# Spread Spectrum procedure
 		else:
 			amps = []
-			N = self.ksp.shape[1]
-			for i, ro in enumerate(np.real(self.ksp)):
+			n_ro = self.ksp.shape[1]
+			for i, ro in enumerate(self.ksp):
 				cor = sig_utils.my_cor(ro, self.prnd_seq)
-				est = np.max(cor) / N
+				est = np.max(np.abs(cor)) / n_ro
 				amps.append(est)
 			amps = np.array(amps)
-			return amps
+		
+		return amps
 	
 	# Generates a single sequence that will repeat itself
 	def prnd_seq_gen(self, p=None, start_state=None, seq_len=None):
