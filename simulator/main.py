@@ -19,13 +19,13 @@ parser.add_argument('--tr_rnd', action='store_true',
 parser.add_argument('-tr', metavar='tr', type=float, default=34,
 					help='Time repetition (TR): Time between readouts (ms). \
 						Default = 34ms')
-parser.add_argument('-pt_bw', metavar='bw', type=float, default=250,
+parser.add_argument('-pt_bw', metavar='pt_bw', type=float, default=250,
 					help='Bandwidth of Pilot Tone: Range of frequencies in imaging band (kHz). \
 						Default = imaging bandwidth')
-parser.add_argument('-im_bw', metavar='bw', type=float, default=250,
+parser.add_argument('-im_bw', metavar='im_bw', type=float, default=250,
 					help='Bandwidth of Pilot Tone: Range of frequencies in imaging band (kHz). \
 						Default = 250kHz')
-parser.add_argument('-pt_amp', metavar='bw', type=float, default=20,
+parser.add_argument('-pt_amp', metavar='pt_amp', type=float, default=20,
 					help='Dimensionless unit of amplitude for the pilot tone. \
 						Default = 20')
 args = parser.parse_args()
@@ -54,7 +54,7 @@ def mod(t):
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
-	mr.prnd_seq_gen(p=0.5, seq_len=mr.ksp.shape[1] * 8)
+	mr.prnd_seq_gen(p=0.5, seq_len=int(mr.ksp.shape[1] * mr.fs_pt / mr.fs))
 
 # Get k-sapce std before adding the PT
 ksp_std = mr.get_ksp_std()
@@ -64,7 +64,7 @@ a, b = mr.add_PT(fpt, tr_uncert=tr_uncert, modulation=mod)
 
 # Plot motion estimates
 motion = np.abs(mr.motion_extract(fpt=fpt))
-true_motion = mr.true_motion
+true_motion = mr.true_motion / np.max(mr.true_motion)
 
 # Print L1 and L2 errors
 print('M(abs)E:', np.sum(np.abs(motion - true_motion)) / mr.ksp.shape[0])
