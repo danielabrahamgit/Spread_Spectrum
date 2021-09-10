@@ -5,6 +5,12 @@ from scipy import signal
 
 class sig_utils:
 
+	# Normalizes a signal
+	def normalize(x):
+		mu = np.mean(x)
+		sig = np.std(x)
+		return (x - mu) / sig
+
 	# Sparsifying threshold
 	def SoftThresh(y, lambd):
 		return (0 + (np.abs(y) - lambd) > 0) * y * (np.abs(y) - lambd) / (np.abs(y) + 1e-8)
@@ -19,6 +25,7 @@ class sig_utils:
 		if shp == None:
 			shp = f.shape
 		return np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(f), s=shp))
+	
 	def ifft2c(F, shp=None):
 		if shp == None:
 			shp = F.shape
@@ -60,10 +67,13 @@ class sig_utils:
 
 class MR_utils:
 	# Set all global constants on initialization
-	def __init__(self, tr=0, bwpp=0, pt_bw=None):	
+	def __init__(self, tr=0, bwpp=0, pt_bw=None, robust=False):	
 		# Timing parameters
 		self.TR  = tr
 		self.BWPP = bwpp
+
+		# Which SSM technique?
+		self.robust = robust
 
 		# Frequencies
 		self.fs = None # Will be calculated soon
@@ -242,6 +252,9 @@ class MR_utils:
 		# Recalculate image
 		self.img = sig_utils.ifft2c(self.ksp)
 
+		# Normalize the true motion
+		self.true_motion = sig_utils.normalize(np.array(self.true_motion))
+
 		# Calculate pilot tone location
 		val = freq / self.fs
 		beta = np.round(val) - val
@@ -267,22 +280,25 @@ class MR_utils:
 		else:
 			amps = []
 			n_ro = self.ksp.shape[1]
-			# for i, ro in enumerate(self.ksp):
-			# 	cor = sig_utils.my_cor(ro, self.prnd_seq)
-			# 	est = np.max(np.abs(cor)) / n_ro
-			# 	amps.append(est)
-	
-			for i, ro in enumerate(self.ksp):
-				sig_up = signal.resample(ro, int(n_ro * self.fs_pt / self.fs))
-				prnd_mults = sig_up * self.prnd_mat
-				# N_diff = len(self.prnd_seq) - len(sig_up)
-				# sig_up = np.concatenate((sig_up, np.zeros(N_diff)))
-				# prnd_mults = sig_up * self.prnd_seq
-				F = np.abs(np.fft.fft(prnd_mults))
-				F = F / len(F)
-				amps.append(np.max(F))
+
+			# Standard procedue assumes no uncertanty in FC/BW
+			if not self.robust:
+				for i, ro in enumerate(self.ksp):
+					cor = sig_utils.my_cor(ro, self.prnd_seq)
+					est = np.max(np.abs(cor)) / n_ro
+					amps.append(est)
+			# Robust SSM technique
+			else:
+				for i, ro in enumerate(self.ksp):
+					sig_up = signal.resample(ro, int(n_ro * self.fs_pt / self.fs))
+					prnd_mults = sig_up * self.prnd_mat
+					F = np.abs(np.fft.fft(prnd_mults))
+					F = F / len(F)
+					amps.append(np.max(F))
+
+		# return motion signal
 		amps = np.array(amps)
-		return amps / np.max(amps)
+		return sig_utils.normalize(amps)
 	
 	# Generates a single sequence that will repeat itself
 	def prnd_seq_gen(self, p=None, start_state=None, seq_len=None):

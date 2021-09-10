@@ -13,6 +13,9 @@ parser.add_argument('-fpt', metavar='fpt', type=float, default=0,
 parser.add_argument('--ssm', action='store_true',
 					help='Do you want to enable spread spectrum? \
 						Default = False')
+parser.add_argument('--robust', action='store_true',
+					help='Uses the brute-force robust SSM technique. \
+						Default = False')
 parser.add_argument('--tr_rnd', action='store_true',
 					help='Do you want to enable uncertainty in TR? \
 						Default = False')
@@ -43,7 +46,7 @@ fpt = args.fpt * 1e3
 im = np.load('../images/brain.npz')['im']
 
 # Initialize MR object with the parameters below
-mr = MR_utils(tr=args.tr * 1e-3, bwpp=args.im_bw * 1e3/im.shape[1], pt_bw=args.pt_bw * 1e3)
+mr = MR_utils(tr=args.tr * 1e-3, bwpp=args.im_bw * 1e3/im.shape[1], pt_bw=args.pt_bw * 1e3, robust=args.robust)
 
 # Load Data into MR object
 mr.load_image(im)
@@ -63,8 +66,8 @@ ksp_std = mr.get_ksp_std()
 a, b = mr.add_PT(fpt, tr_uncert=tr_uncert, modulation=mod)
 
 # Plot motion estimates
-motion = np.abs(mr.motion_extract(fpt=fpt))
-true_motion = mr.true_motion / np.max(mr.true_motion)
+motion = mr.motion_extract(fpt=fpt)
+true_motion = mr.true_motion
 
 # Print L1 and L2 errors
 print('M(abs)E:', np.sum(np.abs(motion - true_motion)) / mr.ksp.shape[0])
@@ -92,8 +95,8 @@ else:
 	plt.title('Pilot Tone Motion Estimate')
 	plt.xlabel('Phase Encode #')
 	plt.ylabel('PT Magnitude')
-	plt.plot(np.abs(motion), label='Estimated')
-	plt.plot(np.abs(true_motion), label='True Modulation', color='r')
+	plt.plot(motion, label='Estimated')
+	plt.plot(true_motion, label='True Modulation', color='r')
 	plt.legend()
 
 # Show eveything
