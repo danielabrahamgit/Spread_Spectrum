@@ -57,7 +57,7 @@ def mod(t):
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
-	mr.prnd_seq_gen(p=0.5, seq_len=int(mr.ksp.shape[1] * mr.fs_pt / mr.fs))
+	mr.prnd_seq_gen(p=0.5, seq_len=mr.ksp.shape[1] * 3)
 
 # Get k-sapce std before adding the PT
 ksp_std = mr.get_ksp_std()

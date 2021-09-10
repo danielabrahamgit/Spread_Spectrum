@@ -5,11 +5,16 @@ from scipy import signal
 
 class sig_utils:
 
+<<<<<<< HEAD
 	# Normalizes a signal
 	def normalize(x):
 		mu = np.mean(x)
 		sig = np.std(x)
 		return (x - mu) / sig
+=======
+	# My version of resample ... 
+	
+>>>>>>> 689e6a02219c165869f15686feefe5d2c70cfbf2
 
 	# Sparsifying threshold
 	def SoftThresh(y, lambd):
@@ -314,6 +319,11 @@ class MR_utils:
 		# Pure orthogonal hadmard codes
 		else:
 			self.prnd_seq = 2 * np.random.randint(0, 2, seq_len) - 1
+
+		N_pt_ro = int(self.ksp.shape[1] * self.fs_pt / self.fs)
+		# Consider a PRND sequence that repeats before a readout ends. Adjust here
+		if len(prnd_seq) < N_pt_ro:
+			self.prnd_seq = np.tile(self.prnd_seq, int(np.ceil(N_pt_ro / len(self.prnd_seq))))
 		
 		L = int(self.ksp.shape[1] * self.fs_pt / self.fs)
 		self.prnd_mat = np.array([np.roll(self.prnd_seq, -i)[:L] for i in range(len(self.prnd_seq))])
