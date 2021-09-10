@@ -5,6 +5,9 @@ from scipy import signal
 
 class sig_utils:
 
+	# My version of resample ... 
+	
+
 	# Sparsifying threshold
 	def SoftThresh(y, lambd):
 		return (0 + (np.abs(y) - lambd) > 0) * y * (np.abs(y) - lambd) / (np.abs(y) + 1e-8)
@@ -275,9 +278,6 @@ class MR_utils:
 			for i, ro in enumerate(self.ksp):
 				sig_up = signal.resample(ro, int(n_ro * self.fs_pt / self.fs))
 				prnd_mults = sig_up * self.prnd_mat
-				# N_diff = len(self.prnd_seq) - len(sig_up)
-				# sig_up = np.concatenate((sig_up, np.zeros(N_diff)))
-				# prnd_mults = sig_up * self.prnd_seq
 				F = np.abs(np.fft.fft(prnd_mults))
 				F = F / len(F)
 				amps.append(np.max(F))
@@ -298,6 +298,11 @@ class MR_utils:
 		# Pure orthogonal hadmard codes
 		else:
 			self.prnd_seq = 2 * np.random.randint(0, 2, seq_len) - 1
+
+		N_pt_ro = int(self.ksp.shape[1] * self.fs_pt / self.fs)
+		# Consider a PRND sequence that repeats before a readout ends. Adjust here
+		if len(prnd_seq) < N_pt_ro:
+			self.prnd_seq = np.tile(self.prnd_seq, int(np.ceil(N_pt_ro / len(self.prnd_seq))))
 		
 		L = int(self.ksp.shape[1] * self.fs_pt / self.fs)
 		self.prnd_mat = np.array([np.roll(self.prnd_seq, -i)[:L] for i in range(len(self.prnd_seq))])
