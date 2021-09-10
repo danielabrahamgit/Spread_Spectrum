@@ -5,16 +5,11 @@ from scipy import signal
 
 class sig_utils:
 
-<<<<<<< HEAD
 	# Normalizes a signal
 	def normalize(x):
 		mu = np.mean(x)
 		sig = np.std(x)
 		return (x - mu) / sig
-=======
-	# My version of resample ... 
-	
->>>>>>> 689e6a02219c165869f15686feefe5d2c70cfbf2
 
 	# Sparsifying threshold
 	def SoftThresh(y, lambd):
