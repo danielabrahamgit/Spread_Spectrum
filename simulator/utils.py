@@ -289,12 +289,13 @@ class MR_utils:
 					amps.append(est)
 			# Robust SSM technique
 			else:
+				assert self.prnd_mat.shape[0] == len(self.prnd_seq)
+				N = int(n_ro * self.fs_pt / self.fs)
 				for i, ro in enumerate(self.ksp):
-					sig_up = signal.resample(ro, int(n_ro * self.fs_pt / self.fs))
+					sig_up = signal.resample(ro, N)
 					prnd_mults = sig_up * self.prnd_mat
-					F = np.abs(np.fft.fft(prnd_mults))
-					F = F / len(F)
-					amps.append(np.max(F))
+					F = np.abs(np.fft.fft(prnd_mults, axis=1))
+					amps.append(np.max(F) / F.shape[1])
 
 		# return motion signal
 		amps = np.array(amps)

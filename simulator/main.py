@@ -76,28 +76,13 @@ print('MSE:', np.sum((motion - true_motion) ** 2) / mr.ksp.shape[0])
 # Show PSNR
 print(f'SNR(dB): {10 * np.log10(mr.P_ksp / mr.P_pt)}')
 
-# Showcase effect of k-space standard deviation 
-# on the inner product method
-if False:
-	plt.subplot(2,1,1)
-	plt.title('Standard Deviation of Each Readout')
-	plt.xlabel('Phase Encode #')
-	plt.ylabel('$\sigma$')
-	plt.plot(ksp_std)
-	plt.subplot(2,1,2)
-	plt.title('Inner Product Estimate')
-	plt.xlabel('Phase Encode #')
-	plt.ylabel('PT Magnitude')
-	plt.plot(np.abs(motion), label='Inner Product Estimate')
-	plt.plot(np.abs(true_motion), label='True Modulation', color='r')
-	plt.legend()
-else:
-	plt.title('Pilot Tone Motion Estimate')
-	plt.xlabel('Phase Encode #')
-	plt.ylabel('PT Magnitude')
-	plt.plot(motion, label='Estimated')
-	plt.plot(true_motion, label='True Modulation', color='r')
-	plt.legend()
+# Display motion estimate
+plt.title('Pilot Tone Motion Estimate')
+plt.xlabel('Phase Encode #')
+plt.ylabel('PT Magnitude')
+plt.plot(motion, label='Estimated')
+plt.plot(true_motion, label='True Modulation', color='r')
+plt.legend()
 
 # Show eveything
 mr.MRshow(drng=1e-6, log_ksp=True, log_ro=True, log_im=False)
