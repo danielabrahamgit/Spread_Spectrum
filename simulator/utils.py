@@ -190,7 +190,7 @@ class MR_utils:
 		plt.show()
 
 	# Adds a pure pilot tone to our kspace data
-	def add_PT(self, freq, tr_uncert=0, modulation=None):
+	def add_PT(self, freq, phase_uncert=0, modulation=None):
 		# Number of phase encodes and readouts
 		n_pe, n_ro = self.ksp.shape
 
@@ -220,8 +220,8 @@ class MR_utils:
 			time_accrued = (pe * self.TR)
 
 			# Factor in uncertanty in TR
-			if tr_uncert != 0:
-				time_accrued *= 1 + (((2 * np.random.rand()) - 1) * tr_uncert)
+			if phase_uncert != 0:
+				time_accrued *= 1 + (((2 * np.random.rand()) - 1) * phase_uncert)
 			
 			# Accrue time 
 			pt_device_time += time_accrued
@@ -237,8 +237,7 @@ class MR_utils:
 
 			# The scanner receivess a resampled version of the original PT signal due to 
 			# a mismatch in the sacnner BW and the PT device BW
-			pt_sig_scanner = signal.resample(pt_sig_device, n_ro)
-
+			pt_sig_scanner = signal.resample_poly(pt_sig_device, n_ro, N_pt_ro)
 			# Keep track of the power levels of the pilot tone and raw readout speraately
 			self.P_pt += np.sum(np.abs(pt_sig_scanner) ** 2)
 			self.P_ksp += np.sum(np.abs(self.ksp[pe,:]) ** 2)
@@ -292,7 +291,7 @@ class MR_utils:
 				assert self.prnd_mat.shape[0] == len(self.prnd_seq)
 				N = int(n_ro * self.fs_pt / self.fs)
 				for i, ro in enumerate(self.ksp):
-					sig_up = signal.resample(ro, N)
+					sig_up = signal.resample_poly(ro, N, n_ro)
 					prnd_mults = sig_up * self.prnd_mat
 					F = np.abs(np.fft.fft(prnd_mults, axis=1))
 					amps.append(np.max(F) / F.shape[1])

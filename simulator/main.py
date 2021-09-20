@@ -16,8 +16,8 @@ parser.add_argument('--ssm', action='store_true',
 parser.add_argument('--robust', action='store_true',
 					help='Uses the brute-force robust SSM technique. \
 						Default = False')
-parser.add_argument('--tr_rnd', action='store_true',
-					help='Do you want to enable uncertainty in TR? \
+parser.add_argument('--phase_rnd', action='store_true',
+					help='Do you want to enable uncertainty in the phase? \
 						Default = False')
 parser.add_argument('-tr', metavar='tr', type=float, default=34,
 					help='Time repetition (TR): Time between readouts (ms). \
@@ -34,10 +34,10 @@ parser.add_argument('-pt_amp', metavar='pt_amp', type=float, default=20,
 args = parser.parse_args()
 
 # Uncertanty in TR
-if args.tr_rnd:
-	tr_uncert = 0.001
+if args.phase_rnd:
+	phase_rnd = 0.0022
 else:
-	tr_uncert = 0
+	phase_rnd = 0
 # Pilot tone frequency
 fpt = args.fpt * 1e3
 
@@ -57,13 +57,13 @@ def mod(t):
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
-	mr.prnd_seq_gen(p=0.5, seq_len=mr.ksp.shape[1] * 3)
+	mr.prnd_seq_gen(p=0.5, seq_len=mr.ksp.shape[1] * 2)
 
 # Get k-sapce std before adding the PT
 ksp_std = mr.get_ksp_std()
 
 # Add Pilot tone (with modulation) and extract motion + image
-a, b = mr.add_PT(fpt, tr_uncert=tr_uncert, modulation=mod)
+a, b = mr.add_PT(fpt, phase_uncert=phase_rnd, modulation=mod)
 
 # Plot motion estimates
 motion = mr.motion_extract(fpt=fpt)
