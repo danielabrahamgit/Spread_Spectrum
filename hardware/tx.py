@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from UHD_utils import UHD_utils
 from scipy import signal
+from PT_utils import *
 
 # ------------- INSERT PATH TO THE UHD FOLDER HERE -------------
 UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
@@ -11,28 +12,30 @@ UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
 uhd = UHD_utils(UHD_DIRECTORY)
 
 # uhd parameters
-freq = 677.887e6
-rate = 100e3
-duration = 0.05
+center_freq = 667e6
+tx_rate = 200e3
 
-# iq_sig gen
-f = 220e3
-N = int(duration * rate)
-n = np.arange(N)
-iq_sig = 1 - 2 * np.random.randint(0, 2, N)
+# SSM Paramters
+prnd_len = 10000
 
-# Resample to higher rate in order to impliment digital LPF
-L = 2
-iq_up = np.zeros(L * len(iq_sig))
-iq_up[::L] = iq_sig
-h = signal.firwin(10, rate/2, fs=rate * L)
-iq_sig = np.convolve(iq_up, h, mode='valid')
+# SSM iq_sig gen
+iq_sig = gen_prnd(prnd_len)
+# n = np.arange(prnd_len)
+# iq_sig = np.cos(2 * np.pi * tx_rate/4 * n / tx_rate)
+
+# Resample
+L = 3
+iq_sig_new_rate = np.zeros(len(iq_sig) * L)
+iq_sig_new_rate[::L] = iq_sig
+h_lpf = signal.firwin(129, tx_rate/2, fs=tx_rate * L)
+iq_sig_new_rate = np.convolve(iq_sig_new_rate, h_lpf, mode='same')
+
 
 # Transmit iq signal infinitely
 uhd.sdr_write(
-	iq_sig=iq_sig,
-	freq=freq,
-	rate=rate * L,
-	gain=30,
+	iq_sig=iq_sig_new_rate,
+	freq=center_freq,
+	rate=tx_rate * L,
+	gain=20,
 	repeat=True)
 
