@@ -301,7 +301,6 @@ class MR_utils:
 		
 		L = int(self.ksp.shape[1] * self.fs_pt / self.fs)
 		self.prnd_mat = np.array([np.roll(self.prnd_seq, -i)[:L] for i in range(len(self.prnd_seq))])
-
 			
 	# Plots the standard deviation across each readout
 	def get_ksp_std(self):

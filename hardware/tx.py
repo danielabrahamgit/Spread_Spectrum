@@ -32,10 +32,17 @@ iq_sig_new_rate = np.convolve(iq_sig_new_rate, h_lpf, mode='same')
 
 
 # Transmit iq signal infinitely
-uhd.sdr_write(
-	iq_sig=iq_sig_new_rate,
-	freq=center_freq,
-	rate=tx_rate * L,
-	gain=40,
-	repeat=True)
-
+if L != 1:
+	uhd.sdr_write(
+		iq_sig=iq_sig_new_rate,
+		freq=center_freq,
+		rate=tx_rate * L,
+		gain=40,
+		repeat=True)
+else:
+	uhd.sdr_write(
+		iq_sig=iq_sig,
+		freq=center_freq,
+		rate=tx_rate,
+		gain=40,
+		repeat=True)

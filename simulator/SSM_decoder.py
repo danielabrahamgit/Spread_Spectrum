@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 from utils import sig_utils
 
 class SSM_decoder:
@@ -41,3 +42,8 @@ class SSM_decoder:
 		return sig_utils.normalize(est)
 
 
+if __name__ == '__main__':
+	if len(sys.argv) == 2:
+		x = 0
+	else:
+		print('Expecting at kspace input file as argument')
