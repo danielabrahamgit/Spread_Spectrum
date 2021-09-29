@@ -12,11 +12,11 @@ UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
 uhd = UHD_utils(UHD_DIRECTORY)
 
 # uhd parameters
-center_freq = 667e6
-tx_rate = 200e3
+center_freq = 127e6
+tx_rate = 500e3
 
 # SSM Paramters
-prnd_len = 10000
+prnd_len = 1001//2
 
 # SSM iq_sig gen
 iq_sig = gen_prnd(prnd_len)
@@ -24,7 +24,7 @@ iq_sig = gen_prnd(prnd_len)
 # iq_sig = np.cos(2 * np.pi * tx_rate/4 * n / tx_rate)
 
 # Resample
-L = 3
+L = 2
 iq_sig_new_rate = np.zeros(len(iq_sig) * L)
 iq_sig_new_rate[::L] = iq_sig
 h_lpf = signal.firwin(129, tx_rate/2, fs=tx_rate * L)
@@ -36,6 +36,6 @@ uhd.sdr_write(
 	iq_sig=iq_sig_new_rate,
 	freq=center_freq,
 	rate=tx_rate * L,
-	gain=20,
+	gain=40,
 	repeat=True)
 

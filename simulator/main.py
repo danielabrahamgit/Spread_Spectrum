@@ -1,4 +1,5 @@
 import argparse
+from SSM_decoder import SSM_decoder
 import numpy as np
 import matplotlib.pyplot as plt
 from utils import MR_utils, sig_utils
@@ -66,7 +67,8 @@ ksp_std = mr.get_ksp_std()
 a, b = mr.add_PT(fpt, phase_uncert=phase_rnd, modulation=mod)
 
 # Plot motion estimates
-motion = mr.motion_extract(fpt=fpt)
+ssm_dec = SSM_decoder(args.im_bw, mr.prnd_seq, pt_fc=args.fpt, pt_bw=args.pt_bw)
+motion = ssm_dec.motion_estimate(mr.ksp, mode='brute')
 true_motion = mr.true_motion
 
 # Print L1 and L2 errors

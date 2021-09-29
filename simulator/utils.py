@@ -5,6 +5,19 @@ from scipy import signal
 
 class sig_utils:
 
+	# My version of resample
+	def my_resample(x, up, down, ntaps=129):
+		gcd = np.gcd(int(up), int(down))
+		up = int(up) // gcd
+		down = int(down) // gcd
+		N = len(x)
+		x_up = np.zeros(N * up, dtype=x.dtype)
+		x_up[::up] = x
+		h_lp = signal.firwin(ntaps, min(1/up, 1/down), fs=2)
+		x_up_lp = np.convolve(x_up, h_lp, mode='same')
+		return x_up_lp[::down]
+		
+
 	# Normalizes a signal
 	def normalize(x):
 		mu = np.mean(x)
@@ -266,40 +279,6 @@ class MR_utils:
 
 		return a, b
 
-	# Extracts Motion signal from Pilot Tone
-	def motion_extract(self, fpt):
-		# Standard Pilot Tone procedure
-		if self.prnd_seq is None:
-			amps = []
-			pt_sig = np.exp(2j*np.pi*fpt*np.arange(self.ksp.shape[1])/self.fs)
-			for ro in self.ksp:
-				amps.append(np.abs(np.vdot(pt_sig, ro)))
-			return np.array(amps) / self.ksp.shape[1]
-		# Spread Spectrum procedure
-		else:
-			amps = []
-			n_ro = self.ksp.shape[1]
-
-			# Standard procedue assumes no uncertanty in FC/BW
-			if not self.robust:
-				for i, ro in enumerate(self.ksp):
-					cor = sig_utils.my_cor(ro, self.prnd_seq)
-					est = np.max(np.abs(cor)) / n_ro
-					amps.append(est)
-			# Robust SSM technique
-			else:
-				assert self.prnd_mat.shape[0] == len(self.prnd_seq)
-				N = int(n_ro * self.fs_pt / self.fs)
-				for i, ro in enumerate(self.ksp):
-					sig_up = signal.resample_poly(ro, N, n_ro)
-					prnd_mults = sig_up * self.prnd_mat
-					F = np.abs(np.fft.fft(prnd_mults, axis=1))
-					amps.append(np.max(F) / F.shape[1])
-
-		# return motion signal
-		amps = np.array(amps)
-		return sig_utils.normalize(amps)
-	
 	# Generates a single sequence that will repeat itself
 	def prnd_seq_gen(self, p=None, start_state=None, seq_len=None):
 		if seq_len is None:
