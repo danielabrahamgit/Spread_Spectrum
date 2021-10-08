@@ -1,0 +1,12 @@
+center_freq:
+127700000.0
+
+tx_rate:
+500000.0
+
+rnd_seq:
+array([-1,  1, -1, ...,  1, -1, -1])
+
+upsample_factor:
+1
+
