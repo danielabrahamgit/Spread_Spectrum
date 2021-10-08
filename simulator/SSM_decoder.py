@@ -38,6 +38,17 @@ class SSM_decoder:
 				prnd_mults = sig_up * prnd_mat
 				F = np.abs(np.fft.fft(prnd_mults, axis=1))
 				est[i] = np.max(F) / F.shape[1]
+				if i == 50:
+					ftemp = 'temp.txt'
+					s = ''
+					np.set_printoptions(threshold=np.inf)		
+					with open(ftemp, 'w') as f:
+						s += repr(sig_up)
+						s += '\n'
+						inds = np.unravel_index(F.argmax(), F.shape)
+						s += repr(prnd_mat[inds[0]])
+						f.write(s)
+					quit()
 
 		return sig_utils.normalize(est)
 
