@@ -8,28 +8,48 @@ from PT_utils import *
 UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
 # --------------------------------------------------------------
 
+# Remebering the sequence
+seq_id = '/scans/cory_long'
+seq_data = {}
+
 # Make instance of UHD_utils class
 uhd = UHD_utils(UHD_DIRECTORY)
 
 # uhd parameters
-center_freq = 127e6
+center_freq = 127.7e6
 tx_rate = 500e3
+gain = 50
+seq_data['center_freq'] = center_freq
+seq_data['tx_rate'] = tx_rate
+seq_data['gain'] = gain
 
 # SSM Paramters
-prnd_len = 1001//2
+prnd_len = 2 ** 7
 
 # SSM iq_sig gen
 iq_sig = gen_prnd(prnd_len)
-# n = np.arange(prnd_len)
-# iq_sig = np.cos(2 * np.pi * tx_rate/4 * n / tx_rate)
+seq_data['rnd_seq'] = iq_sig
 
 # Resample
-L = 2
-iq_sig_new_rate = np.zeros(len(iq_sig) * L)
-iq_sig_new_rate[::L] = iq_sig
-h_lpf = signal.firwin(129, tx_rate/2, fs=tx_rate * L)
-iq_sig_new_rate = np.convolve(iq_sig_new_rate, h_lpf, mode='same')
+L = 1
+# iq_sig_new_rate = np.zeros(len(iq_sig) * L)
+# iq_sig_new_rate[::L] = iq_sig
+# h_lpf = signal.firwin(129, tx_rate/2, fs=tx_rate * L)
+# iq_sig_new_rate = np.convolve(iq_sig_new_rate, h_lpf, mode='same')
 
+seq_data['upsample_factor'] = L
+
+# Save params
+s = ''
+for key in seq_data.keys():
+	s += key + ':\n'
+	s += repr(seq_data[key])
+	s += '\n\n'
+with open(uhd.PY_DIR +  seq_id + '.txt', 'w') as f:
+	f.write(s)
+
+
+filename=seq_id + '.dat'
 
 # Transmit iq signal infinitely
 if L != 1:
@@ -37,12 +57,14 @@ if L != 1:
 		iq_sig=iq_sig_new_rate,
 		freq=center_freq,
 		rate=tx_rate * L,
-		gain=40,
+		gain=gain,
+		file=filename,
 		repeat=True)
 else:
 	uhd.sdr_write(
 		iq_sig=iq_sig,
 		freq=center_freq,
 		rate=tx_rate,
-		gain=40,
+		gain=gain,
+		file=filename,
 		repeat=True)

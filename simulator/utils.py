@@ -5,6 +5,11 @@ from scipy import signal
 
 class sig_utils:
 
+	def auto_cor_mat(X):
+		X_fft = np.fft.fft(X, axis=1)
+		return np.fft.ifft(X_fft * X_fft.conj(), axis=1).real
+
+
 	# My version of resample
 	def my_resample(x, up, down, ntaps=129):
 		gcd = np.gcd(int(up), int(down))
@@ -102,6 +107,7 @@ class MR_utils:
 
 		# For debuging
 		self.ksp_og = None
+		self.true_inds = []
 
 		# PRND sequence for pilot tone
 		self.prnd_seq = None
@@ -245,6 +251,8 @@ class MR_utils:
 			# Since we accrued phase, grab correct shifted random sequence
 			prnd_seq_adjusted = np.roll(prnd_seq, -(pt_device_samples_accrued % len(prnd_seq)))[:N_pt_ro]
 			
+			self.true_inds.append(pt_device_samples_accrued % len(prnd_seq))
+
 			# Device signal is then modulation * pilot tone * rnd sequence
 			pt_sig_device = modulation(time_accrued) * np.exp(2j*np.pi*freq*pt_device_time) * prnd_seq_adjusted
 

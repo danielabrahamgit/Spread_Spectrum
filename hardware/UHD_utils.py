@@ -31,24 +31,23 @@ class UHD_utils:
 		file - Filename to write samples from, <string>
 		repeat - do you want to repeat the signal infinitely?, <bool>
 	"""
-	def sdr_write(self, iq_sig, freq, rate=5e6, gain=10, bw=None, file=None, repeat=False):
+	def sdr_write(self, iq_sig, freq, rate=5e6, gain=10, bw=None, file='write.dat', repeat=False):
 
 		if bw is None:
 			bw = rate
 
 		# File to write from
-		if file is None:
-			file = UHD_utils.PY_DIR +  '/write.dat'
+		file = UHD_utils.PY_DIR + '/' + file
 
-			# Convert iq values to byte array
-			b = bytes()
-			for i, comp in enumerate(iq_sig):
-				b += struct.pack("<f", np.real(comp))
-				b += struct.pack("<f", np.imag(comp))
+		# Convert iq values to byte array
+		b = bytes()
+		for i, comp in enumerate(iq_sig):
+			b += struct.pack("<f", np.real(comp))
+			b += struct.pack("<f", np.imag(comp))
 
-			# write to file
-			with open(file, 'wb') as f:
-				f.write(b)
+		# write to file
+		with open(file, 'wb') as f:
+			f.write(b)
 		
 		# Construct bash command to execute
 		cmd = '"' + UHD_utils.WRITE_SAMPLES + '"'
