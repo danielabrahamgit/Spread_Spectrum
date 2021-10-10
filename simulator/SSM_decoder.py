@@ -40,10 +40,24 @@ class SSM_decoder:
 				prnd_mults = sig_up * prnd_mat
 				F = np.abs(np.fft.fft(prnd_mults, axis=1))
 				est[i] = np.max(F) / F.shape[1]
+<<<<<<< HEAD
+				if i == 50:
+					ftemp = 'temp.txt'
+					s = ''
+					np.set_printoptions(threshold=np.inf)		
+					with open(ftemp, 'w') as f:
+						s += repr(sig_up)
+						s += '\n'
+						inds = np.unravel_index(F.argmax(), F.shape)
+						s += repr(prnd_mat[inds[0]])
+						f.write(s)
+					quit()
+=======
 		elif mode == 'ballpark':
 			fc_expected = SSM_decoder.PT_FC
 			fc_potential = fc_expected + np.linspace(-5,5,11)
 			exps = np.exp(-2j * np.pi * np.outer(fc_potential, np.arange(N)))
+>>>>>>> 65547ab2ddcca812828bdb33b5ac554ebc18ba04
 
 			# Exchaustive search
 			for i, ro in enumerate(ksp):
