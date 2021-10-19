@@ -1,17 +1,20 @@
-from matplotlib import rcParams
+import sys
+import os
+sys.path.append(os.path.abspath('../'))
+
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-from numpy.lib import utils
-from utils import sig_utils
-from numpy.fft import fft, fftshift, ifft
+from utils.sig_utils import sig_utils
+from numpy.fft import fft, fftshift
 from scipy import signal
 
 class SSM_decoder:
 
+	# Pilot tone Bandwidth
 	PT_BW = 500e3
-	# relative to scanner center!
+	# Pilot tone cetner frequency relative to scanner center!
 	PT_FC = 0
 
 	def __init__(self, mr_bw, prnd_seq, pt_fc=0, pt_fc_uncert=0, pt_bw=None, ro_dir='LR'):
@@ -20,11 +23,6 @@ class SSM_decoder:
 
 		# Pseudo random number sequence
 		self.prnd_seq = prnd_seq
-
-		# Describes uncertanty in center frequency
-		self.n_ballpark = 1
-		self.pt_fc_possible = pt_fc + np.linspace(-pt_fc_uncert, pt_fc_uncert, self.n_ballpark) * 1e3
-		self.pt_fc_uncert = pt_fc_uncert
 
 		# Readout direction
 		self.ro_dir = ro_dir
@@ -40,53 +38,21 @@ class SSM_decoder:
 		self.omega = None
 		self.exp = None
 
-	def motion_estimate(self, ksp, mode='brute', true_inds=None):
+	def motion_estimate(self, ksp, mode='brute', normalize=True):
 		# Number of phase encodes and readout length
 		if self.ro_dir == 'LR':
 			npe, ro_len = ksp.shape
 		else:
 			ro_len, npe = ksp.shape
+
+		# number of PT samples in a readout
 		N = int(ro_len * SSM_decoder.PT_BW / self.mr_bw)
-		# Motion estimate 
+		
+		# Motion estimate to return
 		est = np.zeros(npe)
-		inds = []
 
-		if mode == 'brute':
-			# First, we find all possible random sequences :(
-			if len(self.prnd_seq) < N:
-				self.prnd_seq = np.tile(self.prnd_seq, int(np.ceil(N / len(self.prnd_seq))))
-			prnd_mat = np.array([np.roll(self.prnd_seq, -i)[:N] for i in range(len(self.prnd_seq))])
-
-			# Now exhaustively search upon each readout :(
-			for i in range(npe):
-				if self.ro_dir == 'LR':
-					ro = ksp[i, :]
-				else:
-					ro = ksp[:, i]
-				sig_up = sig_utils.my_resample(ro, N, ro_len)
-				prnd_mults = sig_up * prnd_mat
-				F = np.abs(np.fft.fft(prnd_mults, axis=1))
-				est[i] = np.max(F) / F.shape[1]
-		elif mode == 'ballpark':
-			# Possible exponentials 
-			exps = np.exp(-2j * np.pi * np.outer(self.pt_fc_possible, np.arange(N)))
-
-			# Possible random sequences 
-			if len(self.prnd_seq) < N:
-				self.prnd_seq = np.tile(self.prnd_seq, int(np.ceil(N / len(self.prnd_seq))))
-			prnd_mat = np.array([np.roll(self.prnd_seq, -i)[:N] for i in range(len(self.prnd_seq))])
-
-			# Exchaustive search
-			for i in range(npe):
-				if self.ro_dir == 'LR':
-					ro = ksp[i, :]
-				else:
-					ro = ksp[:, i]
-				sig_up = sig_utils.my_resample(ro, N, ro_len)
-				prnd_mults = sig_up * prnd_mat
-				F = exps @ prnd_mults.T
-				est[i] = np.max(np.abs(F))
-		elif mode == 'standard':
+		# Standard Pilot Tone procedure
+		if mode == 'standard':
 			if self.ro_dir == 'LR':
 				fft_ro = fftshift(np.fft.fft(ksp, axis=1), axes=1)
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) ** 2, axis=0))
@@ -95,24 +61,25 @@ class SSM_decoder:
 				fft_ro = fftshift(np.fft.fft(ksp, axis=0), axes=0)
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) ** 2, axis=1))
 				est = np.abs(fft_ro[ind_pt, :])
+		# Robust SSM procedure
 		elif mode == 'RSSM':
 			# Possible random sequences 
 			if len(self.prnd_seq) < N:
 				self.prnd_seq = np.tile(self.prnd_seq, int(np.ceil(N / len(self.prnd_seq))))
 			if self.prnd_mat is None:
 				self.prnd_mat = np.array([np.roll(self.prnd_seq, -i)[:N] for i in range(len(self.prnd_seq))])
-			
-			n = np.arange(N)
-			
+
+			# Go through each readout
 			for i in range(npe):
 				if self.ro_dir == 'LR':
 					ro = ksp[i, :]
 				else:
 					ro = ksp[:, i]
 
-
+				# Upsample readout to PT sample rate
 				sig_up = sig_utils.my_resample(ro, N, ro_len)
-
+				
+				# Center Frequency estimation
 				if self.omega is None:
 					mults = sig_up * self.prnd_mat.conj()
 					n_fft = 2 ** 14
@@ -124,19 +91,24 @@ class SSM_decoder:
 					# fc_error = 127700000 - 127698331
 					# self.omega = -fc_error * 2 * np.pi / self.PT_BW
 					print(self.omega * self.PT_BW / (2 * np.pi))
-					self.exp = np.exp(-1j * self.omega * n)
+					self.exp = np.exp(-1j * self.omega * np.arange(N))
 
+				# Motion extraction via circular correlation
 				cor = sig_utils.my_cor(self.prnd_seq, sig_up * self.exp)
 				
+				# Update estimate
 				est[i] = np.max(np.abs(cor))
 
-		# return sig_utils.normalize(est), inds
-		return est, inds
+		# Normalize the motion estimate if needed
+		if normalize:
+			return sig_utils.normalize(est)
+		else:
+			return est
 
 
 if __name__ == '__main__':
 	if len(sys.argv) == 2:
-		x = 0
+		filename = sys.argv[1]
 	else:
 		print('Expecting at kspace input file as argument')
 

@@ -1,9 +1,13 @@
+import sys
+import os
+sys.path.append(os.path.abspath('../'))
+
 import argparse
 from SSM_decoder import SSM_decoder
 import numpy as np
 import pylab as pl
 import matplotlib.pyplot as plt
-from utils import MR_utils, sig_utils
+from utils.MR_utils import MR_utils
 from PIL import Image
 
 # Argument parser
@@ -60,48 +64,28 @@ mr.load_image(im)
 # Motion modulation signal
 t = np.arange(0, mr.ksp.shape[0], mr.TR)
 mod = (1 + 0.5 * np.sin(2 * np.pi * t ))
-# mod = None
 
 # Uncertantiy in hertz
 fpt_uncert = args.pt_uncert
 fpt_actual = fpt + np.random.uniform(-fpt_uncert, fpt_uncert)
 print(fpt_actual)
 
-
 # Spread spectrum modulation PRN sequence
 if args.ssm:
 	seq_len = mr.ksp.shape[1] * 5
 	mr.prnd_seq_gen(seq_len=seq_len, type='bern', mode='comp', seed=1)
-
-# img = None
-# for i, seq_len in enumerate(np.arange(mr.ksp.shape[1], mr.ksp.shape[1] * mr.ksp.shape[0], mr.ksp.shape[1] * 5)):
-# 	mr.reset_states()
-# 	mr.load_kspace(np.zeros(im.shape, dtype=np.complex128))
-# 	mr.true_motion = []
-# 	mr.prnd_seq_gen(seq_len=seq_len, type='bern', mode='real')
-# 	mr.add_PT(fpt_actual, pt_amp=args.pt_amp, phase_uncert=phase_rnd, modulation=mod)
-# 	im = np.abs(mr.img)
-# 	pl.title(f'RND Sequence Time = {seq_len // mr.ksp.shape[1]} * Readout Time')
-# 	if img is None:
-# 		img = pl.imshow(im, cmap='gray')
-# 		pl.pause(7)
-# 	else:
-# 		img.set_data(im)		
-# 	pl.pause(.5)
-# 	pl.draw()
-# quit()
 
 # Add Pilot tone (with modulation) and extract motion + image
 a, b = mr.add_PT(fpt_actual, pt_amp=args.pt_amp, phase_uncert=phase_rnd, modulation=mod)
 
 # Plot motion estimates
 ssm_dec = SSM_decoder(args.im_bw * 1e3, mr.prnd_seq, pt_fc=args.pt_fc * 1e3, pt_bw=args.pt_bw * 1e3, pt_fc_uncert=fpt_uncert)
-motion, ind = ssm_dec.motion_estimate(mr.ksp, mode='experiment', true_inds=mr.true_inds)
+est_motion = ssm_dec.motion_estimate(mr.ksp, mode='RSSM', normalize=True)
 true_motion = mr.true_motion
 
 # Print L1 and L2 errors
-print('M(abs)E:', np.sum(np.abs(motion - true_motion)) / mr.ksp.shape[0])
-print('MSE:', np.sum((motion - true_motion) ** 2) / mr.ksp.shape[0])
+print('M(abs)E:', np.sum(np.abs(est_motion - true_motion)) / mr.ksp.shape[0])
+print('MSE:', np.sum((est_motion - true_motion) ** 2) / mr.ksp.shape[0])
 
 # Show PSNR
 print(f'SNR(dB): {10 * np.log10(mr.P_ksp / mr.P_pt)}')
@@ -110,9 +94,9 @@ print(f'SNR(dB): {10 * np.log10(mr.P_ksp / mr.P_pt)}')
 plt.title('Pilot Tone Motion Estimate')
 plt.xlabel('Phase Encode #')
 plt.ylabel('PT Magnitude')
-plt.plot(motion, label='Estimated')
+plt.plot(est_motion, label='Estimated')
 plt.plot(true_motion, label='True Modulation', color='r')
 plt.legend()
 
 # Show eveything
-mr.MRshow(drng=1e-6, log_ksp=True, log_ro=True, log_im=False)
+mr.MRshow(drng=1e-6, log_ksp=True, log_ro=True, log_im=False, select=3)
