@@ -2,8 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from math import ceil
 from scipy import signal
+from numpy.fft import fft, fftshift
 
 class sig_utils:
+
+	# Simulates resampling twice 
+	def pt_to_mr_to_pt(pt_sig, up, down):
+		mr_sig = sig_utils.my_resample(pt_sig, down, up)
+		return sig_utils.my_resample(mr_sig, up, down)
 
 	def auto_cor_mat(X):
 		X_fft = np.fft.fft(X, axis=1)
@@ -18,7 +24,7 @@ class sig_utils:
 		N = len(x)
 		x_up = np.zeros(N * up, dtype=x.dtype)
 		x_up[::up] = x
-		h_lp = signal.firwin(ntaps, min(1/up, 1/down), fs=2)
+		h_lp = signal.firwin(ntaps, min(1/up, 1/down), fs=2) * up
 		x_up_lp = np.convolve(x_up, h_lp, mode='same')
 		return x_up_lp[::down]
 		
@@ -27,7 +33,10 @@ class sig_utils:
 	def normalize(x):
 		mu = np.mean(x)
 		sig = np.std(x)
-		return (x - mu) / sig
+		if sig > 0:
+			return (x - mu) / sig
+		else:
+			return x - mu
 
 	# Sparsifying threshold
 	def SoftThresh(y, lambd):
@@ -36,7 +45,7 @@ class sig_utils:
 	# My circular cross correlation
 	def my_cor(x, y):
 		N = max(len(x), len(y))
-		return np.fft.ifft(np.fft.fft(x, n=N) * np.fft.fft(y, n=N).conj()).real
+		return np.fft.ifft(np.fft.fft(x, n=N) * np.fft.fft(y, n=N).conj())
 
 	# 2DFT and inverse 
 	def fft2c(f, shp=None):
@@ -115,6 +124,21 @@ class MR_utils:
 		# True modulation
 		self.true_motion = []
 	
+	def reset_states(self):
+		# PT and image power levels
+		self.P_pt = -1
+		self.P_ksp = -1
+
+		# For debuging
+		self.ksp_og = None
+		self.true_inds = []
+
+		# PRND sequence for pilot tone
+		self.prnd_seq = None
+
+		# True modulation
+		self.true_motion = []
+	
 	# Load an MR image (image space)
 	def load_image(self, img):
 		self.img = img
@@ -140,41 +164,44 @@ class MR_utils:
 		
 		if self.prnd_seq is not None:
 			# Generate subplots
-			fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(ncols=2, nrows=2, figsize=(10, 8))
+			# fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(ncols=2, nrows=2, figsize=(10, 8))
 
-			# Display kspace (top left)
-			ax1.set_title('K-Space')
+			# Display kspace
+			plt.figure()
+			plt.title('K-Space')
 			if log_ksp:
-				ax1.imshow(np.log(np.abs(self.ksp) + drng), cmap='gray')
+				plt.imshow(np.log(np.abs(self.ksp) + drng), cmap='gray')
 			else:
-				ax1.imshow(np.abs(self.ksp), cmap='gray')
+				plt.imshow(np.abs(self.ksp), cmap='gray')
 			
 			# Display image (top right)
-			ax2.set_title('Acquired Image')
+			plt.figure()
+			plt.title('Acquired Image')
+			self.img[self.img.shape[0]//2, self.img.shape[1]//2] = 0
 			if log_im:
-				ax2.imshow(np.log10(np.abs(self.img)), cmap='gray')
+				plt.imshow(np.log10(np.abs(self.img)), cmap='gray')
 			else:
-				ax2.imshow(np.abs(self.img), cmap='gray')
+				plt.imshow(np.abs(self.img), cmap='gray')
 			
-			fig.suptitle(title)
+			# fig.suptitle(title)
 
-			# Display fft along readout (bottom left)
+			# # Display fft along readout (bottom left)
+			plt.figure()
 			fft_readout = np.fft.fftshift(np.fft.fft(self.ksp, axis=1), axes=1)
-			ax3.set_title(f'FFT Along Readout')
-			ax3.set_xlabel(r'$\frac{\omega}{\pi}$')
-			ax3.set_ylabel('Phase Encode #')
+			plt.title(f'FFT Along Readout')
+			plt.xlabel(r'$\frac{\omega}{\pi}$')
+			plt.ylabel('Phase Encode #')
 			if log_ro:
-				ax3.imshow(np.log10(np.abs(fft_readout)), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
+				plt.imshow(np.log10(np.abs(fft_readout)), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
 			else:
-				ax3.imshow(np.abs(fft_readout), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
+				plt.imshow(np.abs(fft_readout), cmap='gray', extent=[-1, 1, self.ksp.shape[1], 0], aspect=2/self.ksp.shape[1])
 			
-			# Display correlated fft along raeadout (bottom right)
-			ax4.set_title('Auto-Correlation of RND Sequence')
-			ax4.set_xlabel('Correlation Index')
-			ax4.set_ylabel('Auto-Correlation')
-			auto = sig_utils.my_cor(self.prnd_seq, self.prnd_seq)
+			# # Display correlated fft along raeadout (bottom right)
+			plt.figure()
+			plt.title('Auto-Correlation of RND Sequence')
+			auto = sig_utils.my_cor(self.prnd_seq, self.prnd_seq).real
 			inds = np.arange(-len(auto)//2, len(auto)//2) 
-			ax4.plot(inds, np.fft.fftshift(auto))
+			plt.plot(inds, np.fft.fftshift(auto))
 		# Regular Pilot Tone
 		else:
 			# Generate subplots
@@ -209,7 +236,7 @@ class MR_utils:
 		plt.show()
 
 	# Adds a pure pilot tone to our kspace data
-	def add_PT(self, freq, phase_uncert=0, modulation=None):
+	def add_PT(self, freq, pt_amp=30, phase_uncert=0, modulation=None):
 		# Number of phase encodes and readouts
 		n_pe, n_ro = self.ksp.shape
 
@@ -217,11 +244,11 @@ class MR_utils:
 		if self.prnd_seq is None:
 			prnd_seq = np.ones(self.ksp.shape[1] * 2)
 		else:
-			prnd_seq = self.prnd_seq
+			prnd_seq = self.prnd_seq.copy()
 		
 		# If no modulation, just make a function that returns 1
 		if modulation is None:
-			modulation = lambda x : 1
+			modulation = np.ones(n_pe)
 
 		# For debugging
 		self.ksp_og = self.ksp.copy()
@@ -230,35 +257,37 @@ class MR_utils:
 		t_readout = 1 / self.BWPP
 
 		# Time axis for PT device
-		pt_device_time = np.arange(0, t_readout, 1/self.fs_pt)
-		N_pt_ro = len(pt_device_time)
+		N_pt_ro = int(t_readout * self.fs_pt)
+		n = np.arange(N_pt_ro)
+
+		# true indices variable
+		true_ind = 0
 
 		# Add pilot tone to kspace data for readout
 		for pe in range(n_pe):
-			# Time passed from start of scan
-			time_accrued = (pe * self.TR)
-
 			# Factor in uncertanty in TR
 			if phase_uncert != 0:
-				time_accrued *= 1 + (((2 * np.random.rand()) - 1) * phase_uncert)
+				TR = self.TR * (1 + (((2 * np.random.rand()) - 1) * phase_uncert))
+			else:
+				TR = self.TR
 			
-			# Accrue time 
-			pt_device_time += time_accrued
+			# Number of samples added from previous readout
+			samples_added = int(TR * self.fs_pt) % N_pt_ro 
+			# samples_added = np.random.randint(0, N_pt_ro)
 
-			# Phase accrued bewtween TRs
-			pt_device_samples_accrued = int(time_accrued * self.fs_pt)
-
-			# Since we accrued phase, grab correct shifted random sequence
-			prnd_seq_adjusted = np.roll(prnd_seq, -(pt_device_samples_accrued % len(prnd_seq)))[:N_pt_ro]
+			# True shift of random sequence (for debugging mainly)
+			true_ind = (true_ind + samples_added) % N_pt_ro
+			self.true_inds.append(true_ind)
 			
-			self.true_inds.append(pt_device_samples_accrued % len(prnd_seq))
-
+			# Adjust the pseudo random sequence
+			prnd_seq = np.roll(prnd_seq, -samples_added)
+			
 			# Device signal is then modulation * pilot tone * rnd sequence
-			pt_sig_device = modulation(time_accrued) * np.exp(2j*np.pi*freq*pt_device_time) * prnd_seq_adjusted
-
+			pt_sig_device = pt_amp * modulation[pe] * np.exp(2j*np.pi*freq*(n + samples_added) / self.fs_pt) * prnd_seq[:N_pt_ro]
+			
 			# The scanner receivess a resampled version of the original PT signal due to 
 			# a mismatch in the sacnner BW and the PT device BW
-			pt_sig_scanner = signal.resample_poly(pt_sig_device, n_ro, N_pt_ro)
+			pt_sig_scanner = sig_utils.my_resample(pt_sig_device, n_ro, N_pt_ro)
 			# Keep track of the power levels of the pilot tone and raw readout speraately
 			self.P_pt += np.sum(np.abs(pt_sig_scanner) ** 2)
 			self.P_ksp += np.sum(np.abs(self.ksp[pe,:]) ** 2)
@@ -267,7 +296,7 @@ class MR_utils:
 			self.ksp[pe,:] += pt_sig_scanner
 
 			# Keep track of the true modulation signal, for later
-			self.true_motion.append(modulation(time_accrued))
+			self.true_motion.append(modulation[pe])
 		
 		# Recalculate image
 		self.img = sig_utils.ifft2c(self.ksp)
@@ -283,32 +312,38 @@ class MR_utils:
 		val = freq * self.TR
 		alpha = np.round(val) - val
 		a = np.round(n_pe/2 + alpha * n_pe)
-		plt.show()
 
 		return a, b
 
 	# Generates a single sequence that will repeat itself
-	def prnd_seq_gen(self, p=None, start_state=None, seq_len=None):
+	def prnd_seq_gen(self, seq_len=None, type='bern', mode='real', seed=None):
 		if seq_len is None:
 			seq_len = self.ksp.shape[1]
-		prnd_seq = []
-		# LFSR
-		if p is None and start_state is not None:
-			self.prnd_seq = sig_utils.lfsr_gen(seq_len, lfsr=start_state)
-		# Binomial
-		elif p is not None and start_state is None:
-			self.prnd_seq = 2 * np.random.binomial(1, p, seq_len) - 1
-		# Pure orthogonal hadmard codes
-		else:
-			self.prnd_seq = 2 * np.random.randint(0, 2, seq_len) - 1
-
-		N_pt_ro = int(self.ksp.shape[1] * self.fs_pt / self.fs)
-		# Consider a PRND sequence that repeats before a readout ends. Adjust here
-		if len(prnd_seq) < N_pt_ro:
-			self.prnd_seq = np.tile(self.prnd_seq, int(np.ceil(N_pt_ro / len(self.prnd_seq))))
 		
-		L = int(self.ksp.shape[1] * self.fs_pt / self.fs)
-		self.prnd_mat = np.array([np.roll(self.prnd_seq, -i)[:L] for i in range(len(self.prnd_seq))])
+		
+		rng = np.random.RandomState(seed)
+
+		if type == 'bern':
+			self.prnd_seq = 2 * rng.randint(0,2,seq_len) - 1 + 1j * (2 * rng.randint(0,2,seq_len) - 1)
+		elif type == 'norm':
+			self.prnd_seq = rng.normal(0, 1, seq_len) + 1j * rng.normal(0, 1, seq_len)
+		elif type == 'unif':
+			self.prnd_seq = rng.uniform(-1, 1, seq_len) + 1j * rng.uniform(-1, 1, seq_len)
+		elif type == 'pois':
+			lambd = 0.01
+			self.prnd_seq = rng.poisson(lambd, seq_len) + 1j * rng.poisson(lambd, seq_len)
+		else:
+			print('Invalid rnd sequence. L8r')
+			quit()
+
+		if mode == 'real':
+			self.prnd_seq = np.real(self.prnd_seq)
+
+		self.prnd_seq = np.sqrt(seq_len) * self.prnd_seq / np.linalg.norm(self.prnd_seq)		
+			
+		N_pt_ro = int(self.ksp.shape[1] * self.fs_pt / self.fs)
+		if seq_len < N_pt_ro:
+			self.prnd_seq = np.tile(self.prnd_seq, int(np.ceil(N_pt_ro / len(self.prnd_seq))))
 			
 	# Plots the standard deviation across each readout
 	def get_ksp_std(self):
