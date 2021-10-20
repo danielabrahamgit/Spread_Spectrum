@@ -1,7 +1,13 @@
+import sys
+import os
+sys.path.append(os.path.abspath('../'))
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
-from ..utils import sig_utils, UHD_utils
+from utils.sig_utils import sig_utils
+from utils.UHD_utils import UHD_utils
 
 # ------------- INSERT PATH TO THE UHD FOLDER HERE -------------
 UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
@@ -9,10 +15,10 @@ UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
 
 
 # --------------- CHANGE SEQUENCE PARAMTERS HERE ---------------
-seq_id = '/scans/cory_test'
+seq_id = '/scans/cory_sine_5hz'
 center_freq = 127.7e6
 tx_rate = 500e3
-tx_gain = 50
+tx_gain = 15
 prnd_seq_len = 2 ** 7
 prnd_type = 'bern'
 prnd_mode = 'real'
