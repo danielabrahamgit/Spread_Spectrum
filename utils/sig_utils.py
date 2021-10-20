@@ -47,6 +47,7 @@ class sig_utils:
 		up = int(up) // gcd
 		down = int(down) // gcd
 		N = len(x)
+		ntaps = min(N * up, ntaps)
 		x_up = np.zeros(N * up, dtype=x.dtype)
 		x_up[::up] = x
 		h_lp = signal.firwin(ntaps, min(1/up, 1/down), fs=2) * up

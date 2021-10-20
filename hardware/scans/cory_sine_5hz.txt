@@ -1,24 +1,16 @@
-prnd_seq_len:
-128
+prnd_seq_len: 16384
 
-prnd_type:
-'bern'
+prnd_type: bern
 
-prnd_mode:
-'real'
+prnd_mode: real
 
-prnd_seed:
-10
+prnd_seed: 10
 
-upsample_factor:
-1
+upsample_factor: 1
 
-center_freq:
-127700000.0
+center_freq: 127700000.0
 
-tx_rate:
-500000.0
+tx_rate: 1000000.0
 
-tx_gain:
-15
+tx_gain: 10
 

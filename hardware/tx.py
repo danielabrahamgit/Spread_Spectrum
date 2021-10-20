@@ -7,19 +7,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 from utils.sig_utils import sig_utils
-from utils.UHD_utils import UHD_utils
+from utils.SDR_utils import UHD_utils
 
 # ------------- INSERT PATH TO THE UHD FOLDER HERE -------------
 UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
 # --------------------------------------------------------------
 
-
 # --------------- CHANGE SEQUENCE PARAMTERS HERE ---------------
 seq_id = '/scans/cory_sine_5hz'
 center_freq = 127.7e6
-tx_rate = 500e3
-tx_gain = 15
-prnd_seq_len = 2 ** 7
+tx_rate = 1e6
+tx_gain = 10
+prnd_seq_len = 2**14
 prnd_type = 'bern'
 prnd_mode = 'real'
 prnd_seed = 10
@@ -41,7 +40,8 @@ seq_data['tx_rate'] = tx_rate
 seq_data['tx_gain'] = tx_gain
 
 # SSM iq_sig gen
-iq_sig = sig_utils.prnd_gen(seq_len=prnd_seq_len, type=prnd_type, mode=prnd_mode, seed=prnd_seed)
+# iq_sig = sig_utils.prnd_gen(seq_len=prnd_seq_len, type=prnd_type, mode=prnd_mode, seed=prnd_seed)
+iq_sig = np.exp(np.arange(prnd_seq_len) * 2j * np.pi * 100e3 / tx_rate)
 
 # Resample If needed
 if L != 1:
@@ -54,14 +54,14 @@ if L != 1:
 # Save to text file
 s = ''
 for key in seq_data.keys():
-	s += key + ':\n'
-	s += repr(seq_data[key])
+	s += key + ': '
+	s += str(seq_data[key])
 	s += '\n\n'
 with open(uhd.PY_DIR +  seq_id + '.txt', 'w') as f:
 	f.write(s)
 
 # Transmit iq signal infinitely
-uhd.sdr_write(
+uhd.uhd_write(
 	iq_sig=iq_sig,
 	freq=center_freq,
 	rate=tx_rate,

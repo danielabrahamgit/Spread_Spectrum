@@ -79,7 +79,7 @@ a, b = mr.add_PT(fpt_actual, pt_amp=args.pt_amp, phase_uncert=phase_rnd, modulat
 
 # Plot motion estimates
 ssm_dec = SSM_decoder(args.im_bw * 1e3, mr.prnd_seq, pt_fc=args.pt_fc * 1e3, pt_bw=args.pt_bw * 1e3, pt_fc_uncert=fpt_uncert)
-est_motion = ssm_dec.motion_estimate(mr.ksp, mode='RSSM', normalize=True)
+est_motion = ssm_dec.motion_estimate_ksp(mr.ksp, mode='RSSM', normalize=True)
 true_motion = mr.true_motion
 
 # Print L1 and L2 errors

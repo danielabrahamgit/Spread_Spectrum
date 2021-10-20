@@ -38,7 +38,13 @@ class SSM_decoder:
 		self.omega = None
 		self.exp = None
 
-	def motion_estimate(self, ksp, mode='brute', normalize=True):
+	def motion_estimate_iq(self, iq, mode='RSSM', normalize=True, chop=20):
+		N = len(iq)
+		iq = np.concatenate((iq, np.zeros((-N) % chop, dtype=iq.dtype)))
+		ksp = np.array([iq[chop*i:chop*(i+1)] for i in range(len(iq) // chop)])		
+		return self.motion_estimate_ksp(ksp, mode=mode, normalize=normalize)
+
+	def motion_estimate_ksp(self, ksp, mode='RSSM', normalize=True):
 		# Number of phase encodes and readout length
 		if self.ro_dir == 'LR':
 			npe, ro_len = ksp.shape
@@ -47,7 +53,7 @@ class SSM_decoder:
 
 		# number of PT samples in a readout
 		N = int(ro_len * SSM_decoder.PT_BW / self.mr_bw)
-		
+
 		# Motion estimate to return
 		est = np.zeros(npe)
 
@@ -92,9 +98,13 @@ class SSM_decoder:
 					# self.omega = -fc_error * 2 * np.pi / self.PT_BW
 					print(self.omega * self.PT_BW / (2 * np.pi))
 					self.exp = np.exp(-1j * self.omega * np.arange(N))
+					self.omega = 0
 
 				# Motion extraction via circular correlation
 				cor = sig_utils.my_cor(self.prnd_seq, sig_up * self.exp)
+
+				# plt.plot(np.abs(cor))
+				# plt.show()
 				
 				# Update estimate
 				est[i] = np.max(np.abs(cor))
