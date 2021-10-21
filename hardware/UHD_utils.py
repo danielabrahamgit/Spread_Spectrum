@@ -106,6 +106,7 @@ class UHD_utils:
 		iq_sig = np.array(I) + 1j * np.array(Q)
 		return iq_sig
 
+
 	def view_spectrum(self, iq_sig, freq, rate, n_avg=1, n_fft=4096):
 		# Break reshape as matrix to optimize many np.fft operations
 		iq_siq = iq_sig[:n_avg * (len(iq_sig) // n_avg)]
@@ -120,3 +121,18 @@ class UHD_utils:
 		plt.plot(fft_axis, fft_mag_avg)
 		plt.xlabel('MHz')
 		plt.show()
+
+def iq_from_file(fname):
+	# Read the samples into an IQ array:
+	with open(fname, 'rb') as f:
+		bytes_read = f.read()
+
+	# read IQ as floats
+	I = []
+	Q = []
+	for i in range(0, len(bytes_read), 8):
+		I.append(struct.unpack('<f', bytes_read[i:i+4]))
+		Q.append(struct.unpack('<f', bytes_read[i+4:i+8]))
+
+	iq_sig = np.array(I) + 1j * np.array(Q)
+	return iq_sig
