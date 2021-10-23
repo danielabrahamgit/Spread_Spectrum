@@ -10,7 +10,6 @@ def plot_fft(time_sig, fs, fc=0, n_fft=4096):
 	plt.figure()
 	plt.plot(fft_axis, np.abs(fft))
 
-
 class RTL_utils:
 
 	def rtl_read(self, freq, rate, num_samples, gain, use_sdr=True, filename='rtl_captures/read.dat'):
@@ -34,6 +33,21 @@ class RTL_utils:
 
 		# return time data
 		return time_data
+	
+	def view_spectrum(self, iq_sig, freq, rate, n_avg=1, n_fft=4096):
+		# Break reshape as matrix to optimize many np.fft operations
+		iq_siq = iq_sig[:n_avg * (len(iq_sig) // n_avg)]
+		iq_siq = iq_sig.reshape((n_avg, -1))
+
+		# Take N_AVG FFTs 
+		fft_mag_avg = np.mean(np.abs(np.fft.fftshift(np.fft.fft(iq_siq, n=n_fft, axis=1), axes=1)), axis=0)
+		fft_axis = np.linspace(freq - rate/2, freq + rate/2, n_fft) / 1e6
+			
+		# Plot decibel scale
+		plt.figure()
+		plt.plot(fft_axis, fft_mag_avg)
+		plt.xlabel('MHz')
+		plt.show()
 
 class UHD_utils:
 
@@ -106,11 +120,10 @@ class UHD_utils:
 	Returns:
 		iq_sig - array of complex numbers, <complex nparray>
 	"""
-	def uhd_read(self, freq, rate=5e6, gain=10, duration=1, file=None):
+	def uhd_read(self, freq, rate=5e6, gain=10, duration=1, file='uhd_iq/write.dat'):
 
 		# file to read samples into
-		if file is None:
-			file = UHD_utils.PY_DIR +  '/read.dat'
+		file = UHD_utils.PY_DIR + '/' + file
 		
 		# Construct bash command to execute
 		cmd = '"' + UHD_utils.READ_SAMPLES + '"'
@@ -137,18 +150,3 @@ class UHD_utils:
 
 		iq_sig = np.array(I) + 1j * np.array(Q)
 		return iq_sig
-
-	def view_spectrum(self, iq_sig, freq, rate, n_avg=1, n_fft=4096):
-		# Break reshape as matrix to optimize many np.fft operations
-		iq_siq = iq_sig[:n_avg * (len(iq_sig) // n_avg)]
-		iq_siq = iq_sig.reshape((n_avg, -1))
-
-		# Take N_AVG FFTs 
-		fft_mag_avg = np.mean(np.abs(np.fft.fftshift(np.fft.fft(iq_siq, n=n_fft, axis=1), axes=1)), axis=0)
-		fft_axis = np.linspace(freq - rate/2, freq + rate/2, n_fft) / 1e6
-			
-		# Plot decibel scale
-		plt.figure()
-		plt.plot(fft_axis, fft_mag_avg)
-		plt.xlabel('MHz')
-		plt.show()

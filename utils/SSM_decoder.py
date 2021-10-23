@@ -42,9 +42,14 @@ class SSM_decoder:
 		N = len(iq)
 		iq = np.concatenate((iq, np.zeros((-N) % chop, dtype=iq.dtype)))
 		ksp = np.array([iq[chop*i:chop*(i+1)] for i in range(len(iq) // chop)])		
+			
 		return self.motion_estimate_ksp(ksp, mode=mode, normalize=normalize)
 
 	def motion_estimate_ksp(self, ksp, mode='RSSM', normalize=True):
+		
+		# plt.imshow(np.abs(fftshift(fft(ksp, axis=1), axes=1)))
+		# plt.show()
+		
 		# Number of phase encodes and readout length
 		if self.ro_dir == 'LR':
 			npe, ro_len = ksp.shape
@@ -59,6 +64,7 @@ class SSM_decoder:
 
 		# Standard Pilot Tone procedure
 		if mode == 'standard':
+			n_fft = ksp.shape[1]
 			if self.ro_dir == 'LR':
 				fft_ro = fftshift(np.fft.fft(ksp, axis=1), axes=1)
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) ** 2, axis=0))
@@ -83,7 +89,10 @@ class SSM_decoder:
 					ro = ksp[:, i]
 
 				# Upsample readout to PT sample rate
-				sig_up = sig_utils.my_resample(ro, N, ro_len)
+				if N != ro_len:
+					sig_up = sig_utils.my_resample(ro, N, ro_len)
+				else:
+					sig_up = ro
 				
 				# Center Frequency estimation
 				if self.omega is None:
