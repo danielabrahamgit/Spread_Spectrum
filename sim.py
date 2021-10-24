@@ -52,7 +52,7 @@ fpt = args.pt_fc * 1e3
 
 # Load MR image
 # im = np.array(Image.open('images/brain.png'))
-im = np.load('images/brain.npz')['im']
+im = np.load('images/brain.npz')['im'] * 0
 
 # Initialize MR object with the parameters below
 mr = MR_utils(tr=args.tr * 1e-3, bwpp=args.im_bw * 1e3/im.shape[1], pt_bw=args.pt_bw * 1e3, robust=args.robust)
@@ -71,7 +71,7 @@ print(fpt_actual)
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
-	seq_len = mr.ksp.shape[1] * 5
+	seq_len = mr.ksp.shape[1] * 3
 	mr.prnd_seq_gen(seq_len=seq_len, type='bern', mode='comp', seed=1)
 
 # Add Pilot tone (with modulation) and extract motion + image

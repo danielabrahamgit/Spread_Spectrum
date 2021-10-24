@@ -30,7 +30,6 @@ class sig_utils:
 
 		return prnd_seq
 
-
 	# Simulates resampling twice 
 	def pt_to_mr_to_pt(pt_sig, up, down):
 		mr_sig = sig_utils.my_resample(pt_sig, down, up)
@@ -39,7 +38,6 @@ class sig_utils:
 	def auto_cor_mat(X):
 		X_fft = np.fft.fft(X, axis=1)
 		return np.fft.ifft(X_fft * X_fft.conj(), axis=1).real
-
 
 	# My version of resample
 	def my_resample(x, up, down, ntaps=129):

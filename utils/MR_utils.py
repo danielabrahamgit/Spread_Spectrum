@@ -1,10 +1,13 @@
 import sys
 import os
+
+from numpy.fft import fftshift, fft
 sys.path.append(os.path.abspath('../'))
 
 import numpy as np
 import matplotlib.pyplot as plt
 from utils.sig_utils import sig_utils
+from scipy import signal
 
 class MR_utils:
 	# Set all global constants on initialization
@@ -162,7 +165,11 @@ class MR_utils:
 			
 			# The scanner receivess a resampled version of the original PT signal due to 
 			# a mismatch in the sacnner BW and the PT device BW
-			pt_sig_scanner = sig_utils.my_resample(pt_sig_device, n_ro, N_pt_ro)
+			pt_sig_scanner = signal.resample_poly(pt_sig_device, n_ro, N_pt_ro)
+			
+			# plt.plot(np.abs(fftshift(fft(pt_sig_scanner))))
+			# plt.show()
+
 			# Keep track of the power levels of the pilot tone and raw readout speraately
 			self.P_pt += np.sum(np.abs(pt_sig_scanner) ** 2)
 			self.P_ksp += np.sum(np.abs(self.ksp[pe,:]) ** 2)

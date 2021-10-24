@@ -45,11 +45,7 @@ class SSM_decoder:
 			
 		return self.motion_estimate_ksp(ksp, mode=mode, normalize=normalize)
 
-	def motion_estimate_ksp(self, ksp, mode='RSSM', normalize=True):
-		
-		# plt.imshow(np.abs(fftshift(fft(ksp, axis=1), axes=1)))
-		# plt.show()
-		
+	def motion_estimate_ksp(self, ksp, mode='RSSM', normalize=True):		
 		# Number of phase encodes and readout length
 		if self.ro_dir == 'LR':
 			npe, ro_len = ksp.shape
@@ -90,14 +86,15 @@ class SSM_decoder:
 
 				# Upsample readout to PT sample rate
 				if N != ro_len:
-					sig_up = sig_utils.my_resample(ro, N, ro_len)
+					# sig_up = sig_utils.my_resample(ro, N, ro_len)
+					sig_up = signal.resample_poly(ro, N, ro_len)
 				else:
 					sig_up = ro
 				
 				# Center Frequency estimation
-				if self.omega is None:
+				if True: #self.omega is None:
 					mults = sig_up * self.prnd_mat.conj()
-					n_fft = 2 ** 14
+					n_fft = 2 ** 11
 					F = np.abs(fft(mults, axis=1, n=n_fft))
 					exp_ind = np.argmax(F) % n_fft
 					self.omega = (2 * np.pi * exp_ind / n_fft)
@@ -107,11 +104,20 @@ class SSM_decoder:
 					# self.omega = -fc_error * 2 * np.pi / self.PT_BW
 					print(self.omega * self.PT_BW / (2 * np.pi))
 					self.exp = np.exp(-1j * self.omega * np.arange(N))
-					self.omega = 0
-
+				
 				# Motion extraction via circular correlation
 				cor = sig_utils.my_cor(self.prnd_seq, sig_up * self.exp)
+				rnd_cor = np.argmax(np.abs(cor))
+				rnd = np.roll(self.prnd_seq, -rnd_cor)[:N]
+				rnd_fft = np.argmax(F) // n_fft
+				for j in range(rnd_cor - 5, rnd_cor + 5):
+					plt.plot(F[j], label= j - rnd_cor)
+					plt.legend()
+				plt.show()
 
+				# plt.subplot(211)
+				# plt.plot(F[rnd_fft])
+				# plt.subplot(212)
 				# plt.plot(np.abs(cor))
 				# plt.show()
 				
@@ -123,6 +129,25 @@ class SSM_decoder:
 			return sig_utils.normalize(est)
 		else:
 			return est
+
+	def motion_esimate_ksp_multi(self, ksp_frames, mode='RSSM', normalize=True):
+		# kx, ky, and frame number on third dimention
+		assert len(ksp_frames.shape) == 3
+
+		motion = None
+		for i in range(ksp_frames.shape[2]):
+			frame = ksp_frames[:,:,i]
+			est_frame_i = self.motion_estimate_ksp(frame, mode=mode, normalize=False)
+			if motion is None:
+				motion = est_frame_i
+			else:
+				motion = np.concatenate((motion, est_frame_i))
+		
+		if normalize:
+			return sig_utils.normalize(motion)
+		else:
+			return motion
+
 
 
 if __name__ == '__main__':
