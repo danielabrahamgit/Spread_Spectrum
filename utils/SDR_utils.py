@@ -40,7 +40,7 @@ class RTL_utils:
 		iq_siq = iq_sig.reshape((n_avg, -1))
 
 		# Take N_AVG FFTs 
-		fft_mag_avg = np.mean(np.abs(np.fft.fftshift(np.fft.fft(iq_siq, n=n_fft, axis=1), axes=1)), axis=0)
+		fft_mag_avg = np.mean(np.abs(np.fft.fftshift(np.fft.fft(iq_siq, n=n_fft, axis=1), axes=1)) ** 2, axis=0)
 		fft_axis = np.linspace(freq - rate/2, freq + rate/2, n_fft) / 1e6
 			
 		# Plot decibel scale

@@ -104,7 +104,11 @@ class SSM_decoder:
 					# self.omega = -fc_error * 2 * np.pi / self.PT_BW
 					print(self.omega * self.PT_BW / (2 * np.pi))
 					self.exp = np.exp(-1j * self.omega * np.arange(N))
+<<<<<<< HEAD
 				
+=======
+
+>>>>>>> 0466f7b03151186de2f087b1addcc51e4859050a
 				# Motion extraction via circular correlation
 				cor = sig_utils.my_cor(self.prnd_seq, sig_up * self.exp)
 				rnd_cor = np.argmax(np.abs(cor))
