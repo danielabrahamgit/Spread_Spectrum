@@ -107,7 +107,6 @@ class SSM_decoder:
 					# self.omega = -fc_error * 2 * np.pi / self.PT_BW
 					print(self.omega * self.PT_BW / (2 * np.pi))
 					self.exp = np.exp(-1j * self.omega * np.arange(N))
-					self.omega = 0
 
 				# Motion extraction via circular correlation
 				cor = sig_utils.my_cor(self.prnd_seq, sig_up * self.exp)
