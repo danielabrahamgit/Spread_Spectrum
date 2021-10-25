@@ -79,21 +79,19 @@ class UHD_utils:
 	"""
 	def uhd_write(self, iq_sig, freq, rate=5e6, gain=10, bw=None, file='uhd_iq/write.dat', repeat=False):
 
-		if bw is None:
-			bw = rate
-
 		# File to write from
 		file = UHD_utils.PY_DIR + '/' + file
 
-		# Convert iq values to byte array
-		b = bytes()
-		for i, comp in enumerate(iq_sig):
-			b += struct.pack("<f", np.real(comp))
-			b += struct.pack("<f", np.imag(comp))
+		iq_sig.tofile(file)
+		# # Convert iq values to byte array
+		# b = bytes()
+		# for i, comp in enumerate(iq_sig):
+		# 	b += struct.pack("<f", float(np.real(comp)))
+		# 	b += struct.pack("<f", float(np.imag(comp)))
 
-		# write to file
-		with open(file, 'wb') as f:
-			f.write(b)
+		# # write to file
+		# with open(file, 'wb') as f:
+		# 	f.write(b)
 		
 		# Construct bash command to execute
 		cmd = '"' + UHD_utils.WRITE_SAMPLES + '"'
@@ -101,7 +99,8 @@ class UHD_utils:
 		cmd += ' --rate ' + str(rate)
 		cmd += ' --type float'
 		cmd += ' --gain ' + str(gain)
-		cmd += ' --bw ' + str(bw)
+		if bw is not None:
+			cmd += ' --bw ' + str(bw)
 		cmd += ' --file ' + file
 		if repeat:
 			cmd += ' --repeat'

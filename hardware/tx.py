@@ -18,9 +18,9 @@ UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
 
 # --------------- CHANGE SEQUENCE PARAMTERS HERE ---------------
 seq_id = '/scans/cory_sine_5hz'
-center_freq = 134.5e6
+center_freq = 152.5e6
 tx_rate = 1e6
-tx_gain = 30
+tx_gain = 50
 prnd_seq_len = 1024
 prnd_type = 'bern'
 prnd_mode = 'real'
@@ -45,19 +45,29 @@ seq_data['tx_gain'] = tx_gain
 # SSM iq_sig gen
 n = np.arange(prnd_seq_len)
 prnd_seq = sig_utils.prnd_gen(seq_len=prnd_seq_len, type=prnd_type, mode=prnd_mode, seed=prnd_seed)
-# iq_sig = np.exp(np.arange(prnd_seq_len) * 2j * np.pi * 0 / tx_rate)
-# iq_sig = np.linspace(-0.5, 0.5, prnd_seq_len) ** 2 
-# iq_sig = signal.firwin(prnd_seq_len, 0.1, fs=2).astype(np.complex128)
-# iq_sig = iq_sig ** 2 / 0.1
+# iq_sig = prnd_seq
+# iq_sig = np.exp(np.arange(prnd_seq_len) * 2j * np.pi * 100e3 / tx_rate)
+# iq_sig = (1 + signal.square(2 * np.pi * 100e3 * n / tx_rate))/2
 
-Npts = 100
-iq_sig = np.tile(prnd_seq, 100)
-A = np.repeat(np.arange(Npts) + 1, prnd_seq_len)
-iq_sig *= A
+# plt.plot(n / tx_rate, iq_sig)
+# plt.show()
 
-# iq_sig *= np.exp(1j * n * 2 * np.pi * (200e3) / tx_rate)
-iq_sig = iq_sig.astype(np.complex128)
 
+wc = 0.1
+iq_sig = signal.firwin(prnd_seq_len, wc, fs=2).astype(np.complex64)
+# iq_sig = iq_sig ** 2 / wc
+
+# # For KSpace simulation
+# Npts = 1000
+# iq_sig = np.tile(iq_sig, Npts)
+# A = np.repeat(np.linspace(0, 1, Npts), prnd_seq_len)
+# iq_sig *= A
+
+# plt.plot(iq_sig.real)
+# plt.show()
+
+iq_sig *= np.exp(1j * n * 2 * np.pi * (200e3) / tx_rate)
+iq_sig = iq_sig.astype(np.complex64)
 
 # dec= SSM_decoder(tx_rate, prnd_seq, pt_bw=1e6)
 

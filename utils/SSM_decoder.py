@@ -17,12 +17,17 @@ class SSM_decoder:
 	# Pilot tone cetner frequency relative to scanner center!
 	PT_FC = 0
 
-	def __init__(self, mr_bw, prnd_seq, pt_fc=0, pt_fc_uncert=0, pt_bw=None, ro_dir='LR'):
+	def __init__(self, mr_bw, prnd_seq, pt_fc=0, doppler_range=None, pt_bw=None, ro_dir='LR'):
 		# Save MR bandwidth for future computation
 		self.mr_bw = mr_bw
 
 		# Pseudo random number sequence
 		self.prnd_seq = prnd_seq
+
+		# Doppler frequency uncertanty (in Hz)
+		self.doppler_range = doppler_range
+		self.doppler_omega = None
+		self.doppler_exp = None
 
 		# Readout direction
 		self.ro_dir = ro_dir
@@ -34,9 +39,6 @@ class SSM_decoder:
 			SSM_decoder.PT_BW = pt_bw
 
 		self.prnd_mat = None
-
-		self.omega = None
-		self.exp = None
 
 	def motion_estimate_iq(self, iq, mode='RSSM', normalize=True, chop=20):
 		N = len(iq)
@@ -84,44 +86,16 @@ class SSM_decoder:
 				else:
 					ro = ksp[:, i]
 
-				# Upsample readout to PT sample rate
-				if N != ro_len:
-					# sig_up = sig_utils.my_resample(ro, N, ro_len)
-					sig_up = signal.resample_poly(ro, N, ro_len)
-				else:
-					sig_up = ro
+				# Upsample readout to PT sample rate				
+				sig_up = signal.resample_poly(ro, N, ro_len)
 				
 				# Center Frequency estimation
-				if True: #self.omega is None:
-					mults = sig_up * self.prnd_mat.conj()
-					n_fft = 2 ** 11
-					F = np.abs(fft(mults, axis=1, n=n_fft))
-					exp_ind = np.argmax(F) % n_fft
-					self.omega = (2 * np.pi * exp_ind / n_fft)
-					if self.omega > np.pi:
-						self.omega -= 2 * np.pi
-					# fc_error = 127700000 - 127698331
-					# self.omega = -fc_error * 2 * np.pi / self.PT_BW
-					print(self.omega * self.PT_BW / (2 * np.pi))
-					self.exp = np.exp(-1j * self.omega * np.arange(N))
-<<<<<<< HEAD
-				
-=======
+				if self.doppler_omega is None:
+					self.estimate_doppler(sig_up)
 
->>>>>>> 0466f7b03151186de2f087b1addcc51e4859050a
 				# Motion extraction via circular correlation
-				cor = sig_utils.my_cor(self.prnd_seq, sig_up * self.exp)
-				rnd_cor = np.argmax(np.abs(cor))
-				rnd = np.roll(self.prnd_seq, -rnd_cor)[:N]
-				rnd_fft = np.argmax(F) // n_fft
-				for j in range(rnd_cor - 5, rnd_cor + 5):
-					plt.plot(F[j], label= j - rnd_cor)
-					plt.legend()
-				plt.show()
-
-				# plt.subplot(211)
-				# plt.plot(F[rnd_fft])
-				# plt.subplot(212)
+				cor = sig_utils.my_cor(self.prnd_seq, sig_up * self.doppler_exp)
+				
 				# plt.plot(np.abs(cor))
 				# plt.show()
 				
@@ -151,6 +125,20 @@ class SSM_decoder:
 			return sig_utils.normalize(motion)
 		else:
 			return motion
+
+	def estimate_doppler(self, sig_up):		
+		N = len(sig_up)
+		mults = sig_up * self.prnd_mat.conj()
+		n_fft = 2 ** 11
+		F = np.abs(fft(mults, axis=1, n=n_fft))
+		exp_ind = np.argmax(F ** 2) % n_fft
+		ind = np.argmax(F ** 2) // n_fft
+		self.doppler_omega = (2 * np.pi * exp_ind / n_fft)
+		if self.doppler_omega > np.pi:
+			self.doppler_omega -= 2 * np.pi
+		# self.doppler_omega = 2 * np.pi * (-10.742187499999998e3) / self.PT_BW
+		print(f'Doppler Estimate = {self.doppler_omega * self.PT_BW / (2e3 * np.pi)} (kHz)')
+		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
 
 
 

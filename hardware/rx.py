@@ -17,9 +17,9 @@ UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
 # --------------------------------------------------------------
 
 # --------------- CHANGE SEQUENCE PARAMTERS HERE ---------------
-center_freq = 134.5e6
+center_freq = 152.5e6
 rx_rate = 1e6
-rx_gain = 20
+rx_gain = 5
 prnd_seq_len = 1024
 prnd_type = 'bern'
 prnd_mode = 'real'
@@ -66,6 +66,8 @@ sig = rtl.rtl_read(
 # M = 1
 # sig = sig_utils.my_resample(sig, 1, M)
 # rx_rate = rx_rate // M
+
+rtl.view_spectrum(sig, center_freq, rx_rate, 1)
 
 prnd_seq = sig_utils.prnd_gen(seq_len=prnd_seq_len, type=prnd_type, mode=prnd_mode, seed=prnd_seed)
 
