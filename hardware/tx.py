@@ -71,10 +71,13 @@ wc = 0.2
 iq_sig = iq_sig.astype(np.complex64)
 w0 = 5e3
 iq_sig *= np.exp(1j * np.arange(len(iq_sig)) * 2 * np.pi * (w0) / tx_rate)
+iq_sig *= np.exp(1j * np.arange(len(iq_sig)) * 2 * np.pi * (-w0) / tx_rate)
 
 cor = sig_utils.my_cor(prnd_seq, iq_sig)
-plt.plot(np.abs(cor))
+plt.plot(np.real(cor))
 plt.show()
+
+quit()
 
 # f = np.linspace(-tx_rate/2e3, tx_rate/2e3, len(iq_sig))
 # plt.ylabel('Magnitude')

@@ -1,3 +1,4 @@
+from matplotlib import use
 import matplotlib.pyplot as plt
 import numpy as np
 import struct
@@ -105,10 +106,11 @@ class UHD_utils:
 		duration - How long are we reading for (sec)?, <float>
 		file - Filename to read samples into, <string>
 		arg - Serial number of the USRP
+		use_sdr - read from file or get new data with SDR?
 	Returns:
 		iq_sig - array of complex numbers, <complex nparray>
 	"""
-	def uhd_read(self, freq, rate=5e6, gain=10, duration=1, file='uhd_iq/read.dat', arg=None):
+	def uhd_read(self, freq, rate=5e6, gain=10, duration=1, file='uhd_iq/read.dat', arg=None, use_sdr=True):
 
 		# file to read samples into
 		file = UHD_utils.PY_DIR + '/' + file
@@ -124,8 +126,9 @@ class UHD_utils:
 		if arg is not None:
 			cmd += ' --args serial=' + arg
 
-		# Now we execute the command and wait for temp_file to be populated
-		os.system(cmd)
+		if use_sdr:
+			# Now we execute the command and wait for temp_file to be populated
+			os.system(cmd)
 
 		# Read the samples into an IQ array:
 		with open(file, 'rb') as f:

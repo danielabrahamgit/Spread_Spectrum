@@ -45,7 +45,8 @@ iq_sig = uhd.uhd_read(
 			rate=rx_rate * M,
 			gain=rx_gain,
 			duration=num_samples / (rx_rate * M),
-			arg='3215B78'
+			arg='3215B78',
+			use_sdr=False
 )
 iq_sig = signal.resample_poly(iq_sig, 1, M)
 
@@ -56,7 +57,7 @@ dec = SSM_decoder(
 			pt_bw=rx_rate
 )
 
-print(len(iq_sig), 100 * prnd_seq_len)
+print(len(iq_sig))
 
 # est = dec.motion_estimate_iq(
 # 			iq_sig, 
@@ -78,6 +79,13 @@ print(len(iq_sig), 100 * prnd_seq_len)
 
 # N = 10
 # iq_sig = np.mean(np.reshape(iq_sig[:(len(iq_sig) // N) * N], (N, -1)), axis=0)
-cor = sig_utils.my_cor(prnd_seq, iq_sig)
-plt.plot(np.abs(cor))
+
+# iq_sig *= np.exp(1j * np.arange(len(iq_sig)) * 2 * np.pi * (-5e3) / rx_rate)
+
+est = dec.motion_estimate_iq(iq_sig, chop=prnd_seq_len, normalize=False)
+plt.plot(est)
 plt.show()
+
+# cor = sig_utils.my_cor(prnd_seq, iq_sig)
+# plt.plot(np.real(cor))
+# plt.show()

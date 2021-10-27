@@ -92,9 +92,12 @@ class SSM_decoder:
 				# Center Frequency estimation
 				if self.doppler_omega is None:
 					self.estimate_doppler(sig_up)
+					self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(npe * ro_len))
+					self.doppler_exp = np.reshape(self.doppler_exp, ksp.shape)
 
 				# Motion extraction via circular correlation
-				cor = sig_utils.my_cor(self.prnd_seq, sig_up * self.doppler_exp)
+				exp = self.doppler_exp[i]
+				cor = sig_utils.my_cor(self.prnd_seq, sig_up * exp)
 				
 				# plt.plot(np.abs(cor))
 				# plt.show()
@@ -103,10 +106,11 @@ class SSM_decoder:
 				
 				# Update estimate
 				# est[i] = np.linalg.norm(sig_up)
-				est[i] = np.abs(np.sum(rnd * sig_up * self.doppler_exp))
+				est[i] = np.real(np.sum(rnd * sig_up * exp))
 				# est[i] = np.max(np.abs(cor))
 
-		# Normalize the motion estimate if needed
+		# Normalize t
+		# he motion estimate if needed
 		if normalize:
 			return sig_utils.normalize(est)
 		else:
@@ -140,9 +144,8 @@ class SSM_decoder:
 		self.doppler_omega = (2 * np.pi * exp_ind / n_fft)
 		if self.doppler_omega > np.pi:
 			self.doppler_omega -= 2 * np.pi
-		# self.doppler_omega = 2 * np.pi * (-5e3) / self.PT_BW
+		self.doppler_omega = 2 * np.pi * (5e3) / self.PT_BW
 		print(f'Doppler Estimate = {self.doppler_omega * self.PT_BW / (2e3 * np.pi)} (kHz)')
-		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
 
 
 
