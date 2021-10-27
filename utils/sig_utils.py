@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from math import ceil
 from scipy import signal
 from numpy.fft import fft, fftshift
@@ -30,6 +31,22 @@ class sig_utils:
 
 		return prnd_seq
 
+	# plot spectrum
+	def view_spectrum(iq_sig, freq, rate, n_avg=1, n_fft=4096, log=False, eps=1e-6):
+		# Break reshape as matrix to optimize many np.fft operations
+		iq_siq = iq_sig[:n_avg * (len(iq_sig) // n_avg)]
+		iq_siq = iq_sig.reshape((n_avg, -1))
+
+		# Take N_AVG FFTs 
+		fft_mag_avg = np.mean(np.abs(np.fft.fftshift(np.fft.fft(iq_siq, n=n_fft, axis=1), axes=1)) ** 2, axis=0)
+		fft_axis = np.linspace(freq - rate/2, freq + rate/2, n_fft) / 1e6
+			
+		# Plot decibel scale if needed
+		if log:
+			fft_mag_avg = np.log(fft_mag_avg + eps)
+		plt.plot(fft_axis, fft_mag_avg)
+		plt.xlabel('MHz')
+		plt.show()
 	# Simulates resampling twice 
 	def pt_to_mr_to_pt(pt_sig, up, down):
 		mr_sig = sig_utils.my_resample(pt_sig, down, up)

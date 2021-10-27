@@ -1,5 +1,7 @@
 import sys
 import os
+
+from numpy.testing._private.utils import IgnoreException
 sys.path.append(os.path.abspath('../'))
 
 
@@ -18,15 +20,17 @@ UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
 
 # --------------- CHANGE SEQUENCE PARAMTERS HERE ---------------
 seq_id = '/scans/cory_sine_5hz'
-center_freq = 152.5e6
+center_freq = 150e6
 tx_rate = 1e6
-tx_gain = 50
+tx_gain = 40
 prnd_seq_len = 1024
-prnd_type = 'bern'
+prnd_type = 'norm'
 prnd_mode = 'real'
 prnd_seed = 10
 L = 1
 # --------------------------------------------------------------
+
+print(f'Time={prnd_seq_len / tx_rate}')
 
 # Make instance of UHD_utils class
 uhd = UHD_utils(UHD_DIRECTORY)
@@ -45,56 +49,49 @@ seq_data['tx_gain'] = tx_gain
 # SSM iq_sig gen
 n = np.arange(prnd_seq_len)
 prnd_seq = sig_utils.prnd_gen(seq_len=prnd_seq_len, type=prnd_type, mode=prnd_mode, seed=prnd_seed)
-# iq_sig = prnd_seq
-# iq_sig = np.exp(np.arange(prnd_seq_len) * 2j * np.pi * 100e3 / tx_rate)
-# iq_sig = (1 + signal.square(2 * np.pi * 100e3 * n / tx_rate))/2
 
-# plt.plot(n / tx_rate, iq_sig)
-# plt.show()
+N = 100
+A = 50 * (2  + np.sin(np.linspace(0, 2 * np.pi, N)))
+A = np.repeat(A, prnd_seq_len)
+iq_sig = np.tile(prnd_seq, N) * A
+
+# IQ SIG BANK
+# iq_sig = np.exp(2j * np.pi * (100e3) * n / tx_rate)
+# iq_sig = signal.square(2 * np.pi * 100e3 * n / tx_rate)
+# iq_sig = np.ones(prnd_seq_len, dtype=np.complex64)
+# iq_sig = np.exp(-0.001 * n)
 
 
-wc = 0.1
-iq_sig = signal.firwin(prnd_seq_len, wc, fs=2).astype(np.complex64)
+# SQUARE/TRIANGLE FREQ GEN
+wc = 0.2
+# iq_sig = signal.firwin(prnd_seq_len, wc, fs=2).astype(np.complex64)
 # iq_sig = iq_sig ** 2 / wc
 
-# # For KSpace simulation
-# Npts = 1000
-# iq_sig = np.tile(iq_sig, Npts)
-# A = np.repeat(np.linspace(0, 1, Npts), prnd_seq_len)
-# iq_sig *= A
-
-# plt.plot(iq_sig.real)
-# plt.show()
-
-iq_sig *= np.exp(1j * n * 2 * np.pi * (200e3) / tx_rate)
+# SHIFT IN FREQUENCY
 iq_sig = iq_sig.astype(np.complex64)
+w0 = 5e3
+iq_sig *= np.exp(1j * np.arange(len(iq_sig)) * 2 * np.pi * (w0) / tx_rate)
 
-# dec= SSM_decoder(tx_rate, prnd_seq, pt_bw=1e6)
-
-# # chop = prnd_seq_len // (10 * M)
-# chop = prnd_seq_len
-# # # print(chop, chop * M)
-# est = dec.motion_estimate_iq(iq_sig, chop=chop, mode='RSSM', normalize=False)
-# t = np.arange(len(est)) * chop / tx_rate
-
-# plt.plot(t, est)
-# plt.show()
-# quit()
-
-f = np.linspace(-tx_rate/2e3, tx_rate/2e3, len(iq_sig))
-plt.ylabel('Magnitude')
-plt.xlabel('Frequency (kHz)')
-plt.plot(f, np.abs(fftshift(fft(iq_sig))))
+cor = sig_utils.my_cor(prnd_seq, iq_sig)
+plt.plot(np.abs(cor))
 plt.show()
+
+# f = np.linspace(-tx_rate/2e3, tx_rate/2e3, len(iq_sig))
+# plt.ylabel('Magnitude')
+# plt.xlabel('Frequency (kHz)')
+# plt.plot(f, np.abs(fftshift(fft(iq_sig))))
+# plt.show()
 
 
 # Resample If needed
 if L != 1:
-	iq_sig_new_rate = np.zeros(len(iq_sig) * L)
-	iq_sig_new_rate[::L] = iq_sig
-	h_lpf = signal.firwin(129, tx_rate/2, fs=tx_rate * L)
-	iq_sig = np.convolve(iq_sig_new_rate, h_lpf, mode='same')
+	iq_sig = signal.resample_poly(iq_sig, L, 1)
 	tx_rate *= L
+	# iq_sig_new_rate = np.zeros(len(iq_sig) * L)
+	# iq_sig_new_rate[::L] = iq_sig
+	# h_lpf = signal.firwin(129, tx_rate/2, fs=tx_rate * L)
+	# iq_sig = np.convolve(iq_sig_new_rate, h_lpf, mode='same')
+	# tx_rate *= L
 
 # Save to text file
 s = ''
@@ -111,4 +108,6 @@ uhd.uhd_write(
 	freq=center_freq,
 	rate=tx_rate,
 	gain=tx_gain,
-	repeat=True)
+	repeat=True,
+	arg='3215B94'
+)

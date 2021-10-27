@@ -42,7 +42,7 @@ class SSM_decoder:
 
 	def motion_estimate_iq(self, iq, mode='RSSM', normalize=True, chop=20):
 		N = len(iq)
-		iq = np.concatenate((iq, np.zeros((-N) % chop, dtype=iq.dtype)))
+		iq = iq[:(N // chop) * chop]
 		ksp = np.array([iq[chop*i:chop*(i+1)] for i in range(len(iq) // chop)])		
 			
 		return self.motion_estimate_ksp(ksp, mode=mode, normalize=normalize)
@@ -98,9 +98,13 @@ class SSM_decoder:
 				
 				# plt.plot(np.abs(cor))
 				# plt.show()
+
+				rnd = np.roll(self.prnd_seq, -np.argmax(np.abs(cor)))[:N]
 				
 				# Update estimate
-				est[i] = np.max(np.abs(cor))
+				# est[i] = np.linalg.norm(sig_up)
+				est[i] = np.abs(np.sum(rnd * sig_up * self.doppler_exp))
+				# est[i] = np.max(np.abs(cor))
 
 		# Normalize the motion estimate if needed
 		if normalize:
@@ -136,7 +140,7 @@ class SSM_decoder:
 		self.doppler_omega = (2 * np.pi * exp_ind / n_fft)
 		if self.doppler_omega > np.pi:
 			self.doppler_omega -= 2 * np.pi
-		# self.doppler_omega = 2 * np.pi * (-10.742187499999998e3) / self.PT_BW
+		# self.doppler_omega = 2 * np.pi * (-5e3) / self.PT_BW
 		print(f'Doppler Estimate = {self.doppler_omega * self.PT_BW / (2e3 * np.pi)} (kHz)')
 		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
 

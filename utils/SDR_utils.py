@@ -33,21 +33,6 @@ class RTL_utils:
 
 		# return time data
 		return time_data
-	
-	def view_spectrum(self, iq_sig, freq, rate, n_avg=1, n_fft=4096):
-		# Break reshape as matrix to optimize many np.fft operations
-		iq_siq = iq_sig[:n_avg * (len(iq_sig) // n_avg)]
-		iq_siq = iq_sig.reshape((n_avg, -1))
-
-		# Take N_AVG FFTs 
-		fft_mag_avg = np.mean(np.abs(np.fft.fftshift(np.fft.fft(iq_siq, n=n_fft, axis=1), axes=1)) ** 2, axis=0)
-		fft_axis = np.linspace(freq - rate/2, freq + rate/2, n_fft) / 1e6
-			
-		# Plot decibel scale
-		plt.figure()
-		plt.plot(fft_axis, fft_mag_avg)
-		plt.xlabel('MHz')
-		plt.show()
 
 class UHD_utils:
 
@@ -76,8 +61,9 @@ class UHD_utils:
 		bw - bandwidth of analog filter <float>
 		file - Filename to write samples from, <string>
 		repeat - do you want to repeat the signal infinitely?, <bool>
+		arg - serial number of USRP device
 	"""
-	def uhd_write(self, iq_sig, freq, rate=5e6, gain=10, bw=None, file='uhd_iq/write.dat', repeat=False):
+	def uhd_write(self, iq_sig, freq, rate=5e6, gain=10, bw=None, file='uhd_iq/write.dat', repeat=False, arg=None):
 
 		# File to write from
 		file = UHD_utils.PY_DIR + '/' + file
@@ -104,7 +90,9 @@ class UHD_utils:
 		cmd += ' --file ' + file
 		if repeat:
 			cmd += ' --repeat'
-		
+		if arg is not None:
+			cmd += ' --args serial=' + arg
+
 		# Now we execute the command and wait for temp_file to be populated
 		os.system(cmd)
 
@@ -116,10 +104,11 @@ class UHD_utils:
 		gain - gain of the SDR (dB), <float>
 		duration - How long are we reading for (sec)?, <float>
 		file - Filename to read samples into, <string>
+		arg - Serial number of the USRP
 	Returns:
 		iq_sig - array of complex numbers, <complex nparray>
 	"""
-	def uhd_read(self, freq, rate=5e6, gain=10, duration=1, file='uhd_iq/write.dat'):
+	def uhd_read(self, freq, rate=5e6, gain=10, duration=1, file='uhd_iq/read.dat', arg=None):
 
 		# file to read samples into
 		file = UHD_utils.PY_DIR + '/' + file
@@ -132,6 +121,8 @@ class UHD_utils:
 		cmd += ' --gain ' + str(gain)
 		cmd += ' --duration ' + str(duration)
 		cmd += ' --file ' + file
+		if arg is not None:
+			cmd += ' --args serial=' + arg
 
 		# Now we execute the command and wait for temp_file to be populated
 		os.system(cmd)
@@ -148,4 +139,4 @@ class UHD_utils:
 			Q.append(struct.unpack('<f', bytes_read[i+4:i+8]))
 
 		iq_sig = np.array(I) + 1j * np.array(Q)
-		return iq_sig
+		return iq_sig.flatten()
