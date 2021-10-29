@@ -7,8 +7,9 @@ import numpy as np
 import sys
 
 from utils.sig_utils import sig_utils
-from numpy.fft import fft, fftshift
+from numpy.fft import fft, fftshift, ifft
 from scipy import signal
+
 
 class SSM_decoder:
 
@@ -40,10 +41,10 @@ class SSM_decoder:
 
 		self.prnd_mat = None
 
-	def motion_estimate_iq(self, iq, mode='RSSM', normalize=True, chop=20):
-		N = len(iq)
-		iq = iq[:(N // chop) * chop]
-		ksp = np.array([iq[chop*i:chop*(i+1)] for i in range(len(iq) // chop)])		
+	def motion_estimate_iq(self, iq_sig, mode='RSSM', normalize=True, chop=20):
+		N = len(iq_sig)
+		iq_sig = iq_sig[:(N // chop) * chop]
+		ksp = np.array([iq_sig[chop*i:chop*(i+1)] for i in range(len(iq_sig) // chop)])		
 			
 		return self.motion_estimate_ksp(ksp, mode=mode, normalize=normalize)
 
@@ -76,8 +77,6 @@ class SSM_decoder:
 			# Possible random sequences 
 			if len(self.prnd_seq) < N:
 				self.prnd_seq = np.tile(self.prnd_seq, int(np.ceil(N / len(self.prnd_seq))))
-			if self.prnd_mat is None:
-				self.prnd_mat = np.array([np.roll(self.prnd_seq, -i)[:N] for i in range(len(self.prnd_seq))])
 
 			# Go through each readout
 			for i in range(npe):
@@ -92,22 +91,13 @@ class SSM_decoder:
 				# Center Frequency estimation
 				if self.doppler_omega is None:
 					self.estimate_doppler(sig_up)
-					self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(npe * ro_len))
-					self.doppler_exp = np.reshape(self.doppler_exp, ksp.shape)
+				
+				demod_sig = sig_up * self.doppler_exp
 
 				# Motion extraction via circular correlation
-				exp = self.doppler_exp[i]
-				cor = sig_utils.my_cor(self.prnd_seq, sig_up * exp)
-				
-				# plt.plot(np.abs(cor))
-				# plt.show()
-
+				cor = sig_utils.my_cor(self.prnd_seq, demod_sig)
 				rnd = np.roll(self.prnd_seq, -np.argmax(np.abs(cor)))[:N]
-				
-				# Update estimate
-				# est[i] = np.linalg.norm(sig_up)
-				est[i] = np.real(np.sum(rnd * sig_up * exp))
-				# est[i] = np.max(np.abs(cor))
+				est[i] = np.abs(np.sum(demod_sig * rnd.conj()))
 
 		# Normalize t
 		# he motion estimate if needed
@@ -134,20 +124,39 @@ class SSM_decoder:
 		else:
 			return motion
 
-	def estimate_doppler(self, sig_up):		
-		N = len(sig_up)
-		mults = sig_up * self.prnd_mat.conj()
-		n_fft = 2 ** 11
-		F = np.abs(fft(mults, axis=1, n=n_fft))
-		exp_ind = np.argmax(F ** 2) % n_fft
-		ind = np.argmax(F ** 2) // n_fft
-		self.doppler_omega = (2 * np.pi * exp_ind / n_fft)
-		if self.doppler_omega > np.pi:
-			self.doppler_omega -= 2 * np.pi
-		self.doppler_omega = 2 * np.pi * (5e3) / self.PT_BW
+	def estimate_doppler(self, sig_up):	
+		N = len(sig_up)	
+		n_fft = len(self.prnd_seq)
+
+		C = fft(self.prnd_seq, n=n_fft).conj()
+		S = fft(sig_up, n=n_fft)
+
+		shift_l = np.round(-self.doppler_range * n_fft / self.PT_BW).astype(int)
+		shift_r = np.round( self.doppler_range * n_fft / self.PT_BW).astype(int)
+
+		S_shifts = np.array([np.roll(S, -i) for i in range(shift_l, shift_r + 1)])
+
+		mults = C * S_shifts
+		xcorrs = ifft(mults, axis=1)
+		m = np.argmax(np.abs(xcorrs))
+		rnd_ind = m % n_fft
+		rnd = np.roll(self.prnd_seq, rnd_ind)[:N]
+		k_est = m // n_fft + shift_l
+
+		# print(rnd[:10])
+
+		omega_low = 2 * np.pi * (k_est - 1) / n_fft
+		omega_high = 2 * np.pi * (k_est + 1) / n_fft
+		omegas = np.linspace(omega_low, omega_high, 10000)
+		
+		exps = np.exp(-1j * np.outer(omegas, np.arange(N)))
+		B = np.sum(exps * sig_up * rnd, axis=1).flatten()
+		self.doppler_omega = omegas[np.argmax(np.abs(B))]
+
+		# self.doppler_omega = 2 * np.pi * (-2.42e3) / self.PT_BW
+
 		print(f'Doppler Estimate = {self.doppler_omega * self.PT_BW / (2e3 * np.pi)} (kHz)')
-
-
+		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
 
 if __name__ == '__main__':
 	if len(sys.argv) == 2:
