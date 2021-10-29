@@ -52,7 +52,7 @@ fpt = args.pt_fc * 1e3
 
 # Load MR image
 # im = np.array(Image.open('images/brain.png'))
-im = np.load('images/brain.npz')['im'] * 0
+im = np.load('images/brain.npz')['im']
 
 # Initialize MR object with the parameters below
 mr = MR_utils(tr=args.tr * 1e-3, bwpp=args.im_bw * 1e3/im.shape[1], pt_bw=args.pt_bw * 1e3, robust=args.robust)
@@ -67,18 +67,26 @@ mod = (1 + 0.5 * np.sin(2 * np.pi * t ))
 # Uncertantiy in hertz
 fpt_uncert = args.pt_uncert
 fpt_actual = fpt + np.random.uniform(-fpt_uncert, fpt_uncert)
-print(fpt_actual)
+fpt_actual = -2.42e3
+print(f'Doppler Actual = {fpt_actual/1e3} (kHz)')
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
-	seq_len = mr.ksp.shape[1] * 3
-	mr.prnd_seq_gen(seq_len=seq_len, type='bern', mode='comp', seed=1)
+	seq_len = mr.ksp.shape[1]
+	mr.prnd_seq_gen(seq_len=seq_len, type='bern', mode='real', seed=1)
 
 # Add Pilot tone (with modulation) and extract motion + image
 a, b = mr.add_PT(fpt_actual, pt_amp=args.pt_amp, phase_uncert=phase_rnd, modulation=mod)
+print(mr.true_rnd[0][:10])
 
 # Plot motion estimates
-ssm_dec = SSM_decoder(args.im_bw * 1e3, mr.prnd_seq, pt_fc=args.pt_fc * 1e3, pt_bw=args.pt_bw * 1e3, pt_fc_uncert=fpt_uncert)
+ssm_dec = SSM_decoder(
+				mr_bw=args.im_bw * 1e3, 
+				prnd_seq=mr.prnd_seq, 
+				pt_fc=args.pt_fc * 1e3, 
+				pt_bw=args.pt_bw * 1e3,
+				doppler_range=fpt_uncert
+)
 est_motion = ssm_dec.motion_estimate_ksp(mr.ksp, mode='RSSM', normalize=True)
 true_motion = mr.true_motion
 

@@ -33,7 +33,7 @@ class MR_utils:
 
 		# For debuging
 		self.ksp_og = None
-		self.true_inds = []
+		self.true_rnd = []
 
 		# PRND sequence for pilot tone
 		self.prnd_seq = None
@@ -155,11 +155,11 @@ class MR_utils:
 
 			# True shift of random sequence (for debugging mainly)
 			true_ind = (true_ind + samples_added) % N_pt_ro
-			self.true_inds.append(true_ind)
 			
 			# Adjust the pseudo random sequence
 			prnd_seq = np.roll(prnd_seq, -samples_added)
-			
+			self.true_rnd.append(prnd_seq[:N_pt_ro])
+
 			# Device signal is then modulation * pilot tone * rnd sequence
 			pt_sig_device = pt_amp * modulation[pe] * np.exp(2j*np.pi*freq*(n + samples_added) / self.fs_pt) * prnd_seq[:N_pt_ro]
 			

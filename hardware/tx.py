@@ -22,9 +22,9 @@ UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
 seq_id = '/scans/cory_sine_5hz'
 center_freq = 150e6
 tx_rate = 1e6
-tx_gain = 40
-prnd_seq_len = 1024
-prnd_type = 'norm'
+tx_gain = 5
+prnd_seq_len = 256
+prnd_type = 'bern'
 prnd_mode = 'real'
 prnd_seed = 10
 L = 1
@@ -48,12 +48,21 @@ seq_data['tx_gain'] = tx_gain
 
 # SSM iq_sig gen
 n = np.arange(prnd_seq_len)
-prnd_seq = sig_utils.prnd_gen(seq_len=prnd_seq_len, type=prnd_type, mode=prnd_mode, seed=prnd_seed)
+prnd_seq = sig_utils.prnd_gen(
+			seq_len=prnd_seq_len, 
+			type=prnd_type, 
+			mode=prnd_mode, 
+			seed=prnd_seed
+)
+
 
 N = 100
-A = 50 * (2  + np.sin(np.linspace(0, 2 * np.pi, N)))
+A = np.linspace(0, 1, N)
+# A = 2 + np.sin(np.linspace(0, 2 * np.pi, N))
 A = np.repeat(A, prnd_seq_len)
+A = A / np.max(np.abs(A))
 iq_sig = np.tile(prnd_seq, N) * A
+# iq_sig = A * np.exp(2j * np.pi * (100e3) * np.arange(len(A)) / tx_rate)
 
 # IQ SIG BANK
 # iq_sig = np.exp(2j * np.pi * (100e3) * n / tx_rate)
@@ -69,32 +78,38 @@ wc = 0.2
 
 # SHIFT IN FREQUENCY
 iq_sig = iq_sig.astype(np.complex64)
-w0 = 5e3
+w0 = 0e3
 iq_sig *= np.exp(1j * np.arange(len(iq_sig)) * 2 * np.pi * (w0) / tx_rate)
-iq_sig *= np.exp(1j * np.arange(len(iq_sig)) * 2 * np.pi * (-w0) / tx_rate)
+# iq_sig *= np.exp(1j * np.arange(len(iq_sig)) * 2 * np.pi * (-w0) / tx_rate)
 
-cor = sig_utils.my_cor(prnd_seq, iq_sig)
-plt.plot(np.real(cor))
+dec = SSM_decoder(
+			mr_bw=tx_rate, 
+			prnd_seq=prnd_seq, 
+			pt_fc=0, 
+			pt_bw=tx_rate,
+			doppler_range=10e3
+)
+
+# est = dec.motion_estimate_iq(iq_sig, chop=prnd_seq_len, normalize=False)
+# plt.plot(est)
+# plt.show()
+
+# cor = sig_utils.my_cor(prnd_seq, iq_sig)
+# plt.plot(np.real(cor))
+# plt.show()
+
+f = np.linspace(-tx_rate/2e3, tx_rate/2e3, len(iq_sig))
+plt.ylabel('Magnitude')
+plt.xlabel('Frequency (kHz)')
+plt.plot(f, np.abs(fftshift(fft(iq_sig))))
 plt.show()
 
-quit()
-
-# f = np.linspace(-tx_rate/2e3, tx_rate/2e3, len(iq_sig))
-# plt.ylabel('Magnitude')
-# plt.xlabel('Frequency (kHz)')
-# plt.plot(f, np.abs(fftshift(fft(iq_sig))))
-# plt.show()
 
 
 # Resample If needed
 if L != 1:
 	iq_sig = signal.resample_poly(iq_sig, L, 1)
 	tx_rate *= L
-	# iq_sig_new_rate = np.zeros(len(iq_sig) * L)
-	# iq_sig_new_rate[::L] = iq_sig
-	# h_lpf = signal.firwin(129, tx_rate/2, fs=tx_rate * L)
-	# iq_sig = np.convolve(iq_sig_new_rate, h_lpf, mode='same')
-	# tx_rate *= L
 
 # Save to text file
 s = ''

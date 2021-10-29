@@ -63,8 +63,9 @@ class UHD_utils:
 		file - Filename to write samples from, <string>
 		repeat - do you want to repeat the signal infinitely?, <bool>
 		arg - serial number of USRP device
+		clk - external clock?
 	"""
-	def uhd_write(self, iq_sig, freq, rate=5e6, gain=10, bw=None, file='uhd_iq/write.dat', repeat=False, arg=None):
+	def uhd_write(self, iq_sig, freq, rate=5e6, gain=10, bw=None, file='uhd_iq/write.dat', repeat=False, arg=None, clk=False):
 
 		# File to write from
 		file = UHD_utils.PY_DIR + '/' + file
@@ -93,6 +94,8 @@ class UHD_utils:
 			cmd += ' --repeat'
 		if arg is not None:
 			cmd += ' --args serial=' + arg
+		if clk:
+			cmd += ' --ref external'
 
 		# Now we execute the command and wait for temp_file to be populated
 		os.system(cmd)
@@ -107,10 +110,11 @@ class UHD_utils:
 		file - Filename to read samples into, <string>
 		arg - Serial number of the USRP
 		use_sdr - read from file or get new data with SDR?
+		clk - External clock?
 	Returns:
 		iq_sig - array of complex numbers, <complex nparray>
 	"""
-	def uhd_read(self, freq, rate=5e6, gain=10, duration=1, file='uhd_iq/read.dat', arg=None, use_sdr=True):
+	def uhd_read(self, freq, rate=5e6, gain=10, duration=1, file='uhd_iq/read.dat', arg=None, use_sdr=True, clk=False):
 
 		# file to read samples into
 		file = UHD_utils.PY_DIR + '/' + file
@@ -125,6 +129,8 @@ class UHD_utils:
 		cmd += ' --file ' + file
 		if arg is not None:
 			cmd += ' --args serial=' + arg
+		if clk:
+			cmd += ' --ref external'
 
 		if use_sdr:
 			# Now we execute the command and wait for temp_file to be populated
