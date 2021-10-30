@@ -59,7 +59,7 @@ class SSM_decoder:
 		N = int(ro_len * SSM_decoder.PT_BW / self.mr_bw)
 
 		# Motion estimate to return
-		est = np.zeros(npe)
+		est = np.zeros(npe, dtype=np.complex128)
 
 		# Standard Pilot Tone procedure
 		if mode == 'standard':
@@ -96,11 +96,15 @@ class SSM_decoder:
 
 				# Motion extraction via circular correlation
 				cor = sig_utils.my_cor(self.prnd_seq, demod_sig)
-				rnd = np.roll(self.prnd_seq, -np.argmax(np.abs(cor)))[:N]
-				est[i] = np.abs(np.sum(demod_sig * rnd.conj()))
 
-		# Normalize t
-		# he motion estimate if needed
+				# if i ==0:
+				# 	plt.plot(np.abs(cor))
+				# 	plt.show()
+
+				rnd = np.roll(self.prnd_seq, -np.argmax(np.abs(cor)))[:N]
+				est[i] = np.sum(demod_sig * rnd.conj())
+
+		# Normalize the motion estimate if needed
 		if normalize:
 			return sig_utils.normalize(est)
 		else:
@@ -150,7 +154,7 @@ class SSM_decoder:
 		omegas = np.linspace(omega_low, omega_high, 10000)
 		
 		exps = np.exp(-1j * np.outer(omegas, np.arange(N)))
-		B = np.sum(exps * sig_up * rnd, axis=1).flatten()
+		B = np.sum(exps * sig_up * rnd.conj(), axis=1).flatten()
 		self.doppler_omega = omegas[np.argmax(np.abs(B))]
 
 		# self.doppler_omega = 2 * np.pi * (-2.42e3) / self.PT_BW
