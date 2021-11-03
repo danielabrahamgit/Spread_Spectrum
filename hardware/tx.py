@@ -47,7 +47,7 @@ iq_sig = np.exp(2j * np.pi * (f_offset) * n / tx_rate)
 
 # N_repeats is the number of time the iq_sig will repeat 
 # when stored in the IQ file. 
-N_repeats = 50
+N_repeats = 20
 iq_sig = np.tile(iq_sig, N_repeats)
 
 iq_sig = iq_sig / (np.max(np.abs(iq_sig)))
