@@ -149,3 +149,24 @@ class UHD_utils:
 
 		iq_sig = np.array(I) + 1j * np.array(Q)
 		return iq_sig.flatten()
+
+	"""
+		Helper function to store sequence parameters into a file
+	"""
+	def save_sequence_params(self, seq_id, prnd_seq_len, prnd_type, prnd_mode, prnd_seed, center_freq, tx_rate, tx_gain):
+		seq_data = {}
+		seq_data['prnd_seq_len'] = prnd_seq_len
+		seq_data['prnd_type'] = prnd_type
+		seq_data['prnd_mode'] = prnd_mode
+		seq_data['prnd_seed'] = prnd_seed
+		seq_data['center_freq'] = center_freq
+		seq_data['tx_rate'] = tx_rate
+		seq_data['tx_gain'] = tx_gain
+
+		s = ''
+		for key in seq_data.keys():
+			s += key + ': '
+			s += str(seq_data[key])
+			s += '\n\n'
+		with open(self.PY_DIR +  seq_id + '.txt', 'w') as f:
+			f.write(s)

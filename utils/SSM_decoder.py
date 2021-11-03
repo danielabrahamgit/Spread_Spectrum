@@ -67,11 +67,11 @@ class SSM_decoder:
 		if mode == 'standard':
 			n_fft = ksp.shape[1]
 			if self.ro_dir == 'LR':
-				fft_ro = fftshift(np.fft.fft(ksp, axis=1, norm='forward'), axes=1)
+				fft_ro = fftshift(np.fft.fft(ksp, axis=1), axes=1)
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) ** 2, axis=0))
 				est = fft_ro[:,ind_pt]
 			else:
-				fft_ro = fftshift(np.fft.fft(ksp, axis=0, norm='forward'), axes=0)
+				fft_ro = fftshift(np.fft.fft(ksp, axis=0), axes=0)
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) ** 2, axis=1))
 				est = fft_ro[ind_pt, :]
 		# Robust SSM procedure
