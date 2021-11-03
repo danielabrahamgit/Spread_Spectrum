@@ -162,8 +162,11 @@ class MR_utils:
 
 			# Device signal is then modulation * pilot tone * rnd sequence
 			# pt_sig_device = pt_amp * modulation[pe] * np.exp(2j*np.pi*freq*(n + samples_added) / self.fs_pt) * prnd_seq[:N_pt_ro]
-			phase_rnd = 1 + 0 * np.exp(1j * np.random.uniform(0, 2 * np.pi))
+			phase_rnd = np.exp(1j * np.random.uniform(0, 2 * np.pi))
 			pt_sig_device = phase_rnd * pt_amp * modulation[pe] * np.exp(2j*np.pi*freq *n / self.fs_pt) * prnd_seq[:N_pt_ro]
+			# h = signal.firwin(10, 0.9, fs=2)
+			# pt_sig_device = np.convolve(pt_sig_device, h, mode='same')
+			# pt_sig_device +=  10 * phase_rnd * np.exp(2j*np.pi*100e3 *n / self.fs_pt)
 
 			# The scanner receivess a resampled version of the original PT signal due to 
 			# a mismatch in the sacnner BW and the PT device BW
