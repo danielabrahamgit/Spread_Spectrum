@@ -72,8 +72,13 @@ class SSM_decoder:
 				est = fft_ro[:,ind_pt]
 			else:
 				fft_ro = fftshift(np.fft.fft(ksp, axis=0, norm='forward'), axes=0)
-				ind_pt = np.argmax(np.sum(np.abs(fft_ro) ** 2, axis=1))
+				ind_pt = 20#np.argmax(np.sum(np.abs(fft_ro) / np.linalg.norm(fft_ro,axis=0) ** 2, axis=1))
 				est = fft_ro[ind_pt, :]
+			
+			# print(ind_pt)
+
+			# plt.imshow(np.abs(fft_ro))
+			# plt.show()
 		# Robust SSM procedure
 		elif mode == 'RSSM':
 			# Possible random sequences 
@@ -99,9 +104,8 @@ class SSM_decoder:
 				# Motion extraction via circular correlation
 				cor = sig_utils.my_cor(self.prnd_seq, demod_sig)
 
-				# if i % 50 == 0:
-				# 	plt.plot(np.abs(cor))
-				# 	plt.show()
+				plt.plot(np.abs(cor))
+				plt.show()
 
 				ind = np.argmax(np.abs(cor))
 				self.rnd_inds.append(ind)
@@ -110,7 +114,7 @@ class SSM_decoder:
 
 		return est
 
-	def motion_esimate_ksp_multi(self, ksp_frames, mode='RSSM'):
+	def motion_estimate_ksp_multi(self, ksp_frames, mode='RSSM'):
 		# kx, ky, and frame number on third dimention
 		assert len(ksp_frames.shape) == 3
 
@@ -152,7 +156,7 @@ class SSM_decoder:
 		B = np.sum(exps * sig_up * rnd.conj(), axis=1).flatten()
 		self.doppler_omega = omegas[np.argmax(np.abs(B))]
 
-		# self.doppler_omega = 2 * np.pi * (0.5) / self.PT_BW
+		# self.doppler_omega = 2 * np.pi * (0.0) / self.PT_BW
 
 		print(f'Doppler Estimate = {self.doppler_omega * self.PT_BW / (2e3 * np.pi)} (kHz)')
 		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
