@@ -1,10 +1,13 @@
 import sys
 import os
+
+from numpy.fft import fftshift, fft
 sys.path.append(os.path.abspath('../'))
 
 import numpy as np
 import matplotlib.pyplot as plt
 from utils.sig_utils import sig_utils
+from scipy import signal
 
 class MR_utils:
 	# Set all global constants on initialization
@@ -30,7 +33,7 @@ class MR_utils:
 
 		# For debuging
 		self.ksp_og = None
-		self.true_inds = []
+		self.true_rnd = []
 
 		# PRND sequence for pilot tone
 		self.prnd_seq = None
@@ -152,17 +155,26 @@ class MR_utils:
 
 			# True shift of random sequence (for debugging mainly)
 			true_ind = (true_ind + samples_added) % N_pt_ro
-			self.true_inds.append(true_ind)
 			
 			# Adjust the pseudo random sequence
 			prnd_seq = np.roll(prnd_seq, -samples_added)
-			
+			self.true_rnd.append(prnd_seq[:N_pt_ro])
+
 			# Device signal is then modulation * pilot tone * rnd sequence
-			pt_sig_device = pt_amp * modulation[pe] * np.exp(2j*np.pi*freq*(n + samples_added) / self.fs_pt) * prnd_seq[:N_pt_ro]
-			
+			# pt_sig_device = pt_amp * modulation[pe] * np.exp(2j*np.pi*freq*(n + samples_added) / self.fs_pt) * prnd_seq[:N_pt_ro]
+			phase_rnd = np.exp(1j * np.random.uniform(0, 2 * np.pi))
+			pt_sig_device = phase_rnd * pt_amp * modulation[pe] * np.exp(2j*np.pi*freq *n / self.fs_pt) * prnd_seq[:N_pt_ro]
+			# h = signal.firwin(10, 0.9, fs=2)
+			# pt_sig_device = np.convolve(pt_sig_device, h, mode='same')
+			# pt_sig_device +=  10 * phase_rnd * np.exp(2j*np.pi*100e3 *n / self.fs_pt)
+
 			# The scanner receivess a resampled version of the original PT signal due to 
 			# a mismatch in the sacnner BW and the PT device BW
-			pt_sig_scanner = sig_utils.my_resample(pt_sig_device, n_ro, N_pt_ro)
+			pt_sig_scanner = signal.resample_poly(pt_sig_device, n_ro, N_pt_ro)
+			
+			# plt.plot(np.abs(fftshift(fft(pt_sig_scanner))))
+			# plt.show()
+
 			# Keep track of the power levels of the pilot tone and raw readout speraately
 			self.P_pt += np.sum(np.abs(pt_sig_scanner) ** 2)
 			self.P_ksp += np.sum(np.abs(self.ksp[pe,:]) ** 2)
