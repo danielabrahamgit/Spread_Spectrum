@@ -25,9 +25,13 @@ prnd_seq_len = 22000
 prnd_type = 'bern'
 prnd_mode = 'real'
 prnd_seed = 10
+<<<<<<< HEAD
+num_samples = prnd_seq_len * 100
+=======
 read_time = 20
 num_samples = rx_rate * read_time
 M = 1
+>>>>>>> ab0dbc4f9878aa0519978dc9986fd31da2917aec
 # --------------------------------------------------------------
 
 # Copy prnd seq
@@ -46,6 +50,15 @@ iq_sig = uhd.uhd_read(
 			freq=center_freq,
 			rate=rx_rate,
 			gain=rx_gain,
+<<<<<<< HEAD
+			duration=num_samples / rx_rate,
+			arg='3215B78',
+			use_sdr=False,
+			file='uhd_iq/write.dat'
+)
+
+print(iq_sig[:10])
+=======
 			duration=read_time,
 			arg='3215B78',
 			use_sdr=True
@@ -66,3 +79,4 @@ est = dec.motion_estimate_iq(
 )
 plt.plot(np.arange(len(est)) * 256 / rx_rate, np.abs(est))
 plt.show()
+>>>>>>> ab0dbc4f9878aa0519978dc9986fd31da2917aec

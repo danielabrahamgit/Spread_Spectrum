@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from utils.MR_utils import MR_utils
 from utils.SSM_decoder import SSM_decoder
 from PIL import Image
+from scipy import signal
+
+from utils.sig_utils import sig_utils
 
 # Argument parser
 parser = argparse.ArgumentParser(description='Standard and Spread Spectrum Pilot Tone Simulator. \
@@ -62,17 +65,16 @@ mr.load_image(im)
 
 # Motion modulation signal
 t = np.arange(0, mr.ksp.shape[0], mr.TR)
-mod = (1 + 0.5 * np.sin(2 * np.pi * t ))
+mod = (1 + 0.5 * signal.square(2 * np.pi * t * 0.1 ))
 
 # Uncertantiy in hertz
 fpt_uncert = args.pt_uncert
 fpt_actual = fpt + np.random.uniform(-fpt_uncert, fpt_uncert)
-fpt_actual = -2.42e3
 print(f'Doppler Actual = {fpt_actual/1e3} (kHz)')
 
 # Spread spectrum modulation PRN sequence
 if args.ssm:
-	seq_len = mr.ksp.shape[1]
+	seq_len = mr.ksp.shape[1] * 20
 	mr.prnd_seq_gen(seq_len=seq_len, type='bern', mode='real', seed=1)
 
 # Add Pilot tone (with modulation) and extract motion + image
@@ -87,17 +89,17 @@ ssm_dec = SSM_decoder(
 				pt_bw=args.pt_bw,
 				doppler_range=fpt_uncert
 )
-est_motion = ssm_dec.motion_estimate_ksp(mr.ksp, mode='RSSM', normalize=False)
+est_motion = sig_utils.normalize(np.abs(ssm_dec.motion_estimate_ksp(mr.ksp, mode='RSSM')))
 true_motion = mr.true_motion
 
-plt.subplot(311)
-plt.plot(est_motion.real)
-plt.subplot(312)
-plt.plot(est_motion.imag)
-plt.subplot(313)
-plt.plot(np.abs(est_motion))
-plt.show()
-quit()
+# plt.subplot(311)
+# plt.plot(est_motion.real)
+# plt.subplot(312)
+# plt.plot(est_motion.imag)
+# plt.subplot(313)
+# plt.plot(np.abs(est_motion))
+# plt.show()
+# quit()
 
 # Print L1 and L2 errors
 print('M(abs)E:', np.sum(np.abs(est_motion - true_motion)) / mr.ksp.shape[0])
