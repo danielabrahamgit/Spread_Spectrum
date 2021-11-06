@@ -87,10 +87,14 @@ ssm_dec = SSM_decoder(
 				prnd_seq=mr.prnd_seq, 
 				pt_fc=args.pt_fc, 
 				pt_bw=args.pt_bw,
-				doppler_range=fpt_uncert
+				doppler_range=fpt_uncert,
+				ksp=mr.ksp
 )
-est_motion = sig_utils.normalize(np.abs(ssm_dec.motion_estimate_ksp(mr.ksp, mode='RSSM')))
+est_motion, ksp_est = ssm_dec.motion_estimate(mode='RSSM')
+est_motion = sig_utils.normalize(np.abs(est_motion))
 true_motion = mr.true_motion
+
+img_new = sig_utils.ifft2c(ksp_est)
 
 # plt.subplot(311)
 # plt.plot(est_motion.real)
@@ -115,6 +119,9 @@ plt.ylabel('PT Magnitude')
 plt.plot(est_motion, label='Estimated')
 plt.plot(true_motion, label='True Modulation', color='r')
 plt.legend()
+
+plt.figure()
+plt.imshow(np.abs(img_new), cmap='gray')
 
 # Show eveything
 mr.MRshow(drng=1e-6, log_ksp=True, log_ro=True, log_im=False, select=3)

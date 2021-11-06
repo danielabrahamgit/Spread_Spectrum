@@ -1,5 +1,7 @@
 import sys
 import os
+
+import scipy
 sys.path.append(os.path.abspath('../'))
 
 import matplotlib.pyplot as plt
@@ -13,14 +15,11 @@ from scipy import signal
 
 class SSM_decoder:
 
-	# Pilot tone Bandwidth
-	PT_BW = 500e3
-	# Pilot tone cetner frequency relative to scanner center!
-	PT_FC = 0
-
-	def __init__(self, mr_bw, prnd_seq, pt_fc=0, doppler_range=None, pt_bw=None, ro_dir='LR'):
-		# Save MR bandwidth for future computation
+	def __init__(self, prnd_seq, ksp, mr_bw, pt_bw=250e3, pt_fc=0, doppler_range=None, ro_dir='LR'):
+		# Save MR/PT bandwidth for future computation
 		self.mr_bw = mr_bw
+		self.pt_bw = pt_bw
+		self.pt_fc = pt_fc
 
 		# Pseudo random number sequence
 		self.prnd_seq = prnd_seq
@@ -33,14 +32,8 @@ class SSM_decoder:
 		# Readout direction
 		self.ro_dir = ro_dir
 
-		# Update PT parameters if needed
-		if pt_fc is not None:
-			SSM_decoder.PT_FC = pt_fc
-		if pt_bw is not None:
-			SSM_decoder.PT_BW = pt_bw
-
-		self.prnd_mat = None
-		self.rnd_inds = []
+		self.ksp = ksp
+		self.corrected_ksp = np.zeros_like(ksp)
 
 	def motion_estimate_iq(self, iq_sig, mode='RSSM', chop=20):
 		N = len(iq_sig)
@@ -50,7 +43,7 @@ class SSM_decoder:
 			
 		return self.motion_estimate_ksp(ksp, mode=mode)
 
-	def motion_estimate_ksp(self, ksp, mode='RSSM', show_peaks=False):		
+	def motion_estimate_ksp(self, ksp, mode='RSSM'):		
 		# Number of phase encodes and readout length
 		if self.ro_dir == 'LR':
 			npe, ro_len = ksp.shape
@@ -58,10 +51,13 @@ class SSM_decoder:
 			ro_len, npe = ksp.shape
 
 		# number of PT samples in a readout
-		N = int(ro_len * SSM_decoder.PT_BW / self.mr_bw)
+		N = int(ro_len * self.pt_bw / self.mr_bw)
 
 		# Motion estimate to return
 		est = np.zeros(npe, dtype=np.complex128)
+
+		# kspace like matrix that will be populatede with PT contributions
+		ksp_est = np.zeros_like(ksp)
 
 		# Standard Pilot Tone procedure
 		if mode == 'standard':
@@ -71,7 +67,7 @@ class SSM_decoder:
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) ** 2, axis=0))
 				est = fft_ro[:,ind_pt]
 			else:
-				fft_ro = fftshift(np.fft.fft(ksp, axis=0), axes=0)
+				fft_ro = fftshift(np.fft.fft(ksp, axis=0, norm='forward'), axes=0)
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) / np.linalg.norm(fft_ro,axis=0) ** 2, axis=1))
 				est = fft_ro[ind_pt, :]
 			
@@ -104,34 +100,38 @@ class SSM_decoder:
 				# Motion extraction via circular correlation
 				cor = sig_utils.my_cor(self.prnd_seq, demod_sig)
 
-				if show_peaks and i % 50 == 0:
-					plt.plot(np.abs(cor))
-					plt.show()
-
 				ind = np.argmax(np.abs(cor))
-				self.rnd_inds.append(ind)
 				rnd = np.roll(self.prnd_seq, -ind)[:N]
-				est[i] = np.mean(demod_sig * rnd.conj())
+				est[i] = np.sum(demod_sig * rnd.conj()) / N
 
-		return est
+				ro_est = signal.resample_poly(sig_up -  est[i] * rnd, ro_len, N)
 
-	def motion_estimate_ksp_multi(self, ksp_frames, mode='RSSM', show_peaks=False):
+				if self.ro_dir == 'LR':
+					ksp_est[i, :] = ro_est
+				else:
+					ksp_est[:, i] = ro_est
+
+		return est, ksp_est
+
+	def motion_estimate(self, mode='RSSM'):
 		# kx, ky, and frame number on third dimention
-		assert len(ksp_frames.shape) == 3
-
+		assert len(self.ksp.shape) >= 2
+		ksp_est = np.zeros_like(self.ksp)
 		motion = None
-		for i in range(ksp_frames.shape[2]):
-			frame = ksp_frames[:,:,i]
-			if i == 0:
-				est_frame_i = self.motion_estimate_ksp(frame, mode=mode, show_peaks=show_peaks)
-			else:
-				est_frame_i = self.motion_estimate_ksp(frame, mode=mode, show_peaks=False)
-			if motion is None:
-				motion = est_frame_i
-			else:
-				motion = np.concatenate((motion, est_frame_i))
+		if len(self.ksp.shape) == 3:
+			ksp_frames = self.ksp
+			for i in range(ksp_frames.shape[2]):
+				frame = ksp_frames[:,:,i]
+				est_frame_i, ksp_est_i = self.motion_estimate_ksp(frame, mode=mode)
+				if motion is None:
+					motion = est_frame_i
+				else:
+					motion = np.concatenate((motion, est_frame_i))
+				ksp_est[:,:,i] = ksp_est_i
+		else:
+			motion, ksp_est = self.motion_estimate_ksp(self.ksp, mode=mode)
 		
-		return motion
+		return motion, ksp_est
 
 	def estimate_doppler(self, sig_up):	
 		N = len(sig_up)	
@@ -140,8 +140,8 @@ class SSM_decoder:
 		C = fft(self.prnd_seq, n=n_fft).conj()
 		S = fft(sig_up, n=n_fft)
 
-		shift_l = np.round(-self.doppler_range * n_fft / self.PT_BW).astype(int)
-		shift_r = np.round( self.doppler_range * n_fft / self.PT_BW).astype(int)
+		shift_l = np.round(-self.doppler_range * n_fft / self.pt_bw).astype(int)
+		shift_r = np.round( self.doppler_range * n_fft / self.pt_bw).astype(int)
 
 		S_shifts = np.array([np.roll(S, -i) for i in range(shift_l, shift_r + 1)])
 
@@ -160,9 +160,9 @@ class SSM_decoder:
 		B = np.sum(exps * sig_up * rnd.conj(), axis=1).flatten()
 		self.doppler_omega = omegas[np.argmax(np.abs(B))]
 
-		self.doppler_omega = 2 * np.pi * (0.0) / self.PT_BW
+		# self.doppler_omega = 2 * np.pi * (0.0) / self.pt_bw
 
-		print(f'Doppler Estimate = {self.doppler_omega * self.PT_BW / (2e3 * np.pi)} (kHz)')
+		print(f'Doppler Estimate = {self.doppler_omega * self.pt_bw / (2e3 * np.pi)} (kHz)')
 		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
 
 if __name__ == '__main__':

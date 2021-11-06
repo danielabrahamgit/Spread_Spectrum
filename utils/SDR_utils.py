@@ -41,14 +41,14 @@ class UHD_utils:
 		UHD_utils.UHD_DIRECTORY = uhd_dir
 
 		# Important directories
-		# UHD_utils.PY_DIR = os.getcwd().replace('\\', '/')
-		UHD_utils.PY_DIR = os.getcwd()
+		UHD_utils.PY_DIR = os.getcwd().replace('\\', '/')
+		# UHD_utils.PY_DIR = os.getcwd()
 
 		# SA Changed for Mac - everything is the same directory
-		# UHD_utils.BIN_DIRECTORY = UHD_utils.UHD_DIRECTORY + '/bin'
-		# UHD_utils.EXEC_DIRECTORY = UHD_utils.UHD_DIRECTORY + '/lib/uhd/examples'
-		UHD_utils.BIN_DIRECTORY = UHD_utils.UHD_DIRECTORY
-		UHD_utils.EXEC_DIRECTORY = UHD_utils.UHD_DIRECTORY
+		UHD_utils.BIN_DIRECTORY = UHD_utils.UHD_DIRECTORY + '/bin'
+		UHD_utils.EXEC_DIRECTORY = UHD_utils.UHD_DIRECTORY + '/lib/uhd/examples'
+		# UHD_utils.BIN_DIRECTORY = UHD_utils.UHD_DIRECTORY
+		# UHD_utils.EXEC_DIRECTORY = UHD_utils.UHD_DIRECTORY
 
 		# Important files
 		UHD_utils.READ_SAMPLES = UHD_utils.EXEC_DIRECTORY + '/rx_samples_to_file'
@@ -56,7 +56,7 @@ class UHD_utils:
 
 		# SA Remove for Mac
 		# Change to BIN Directory since it contains the .dll file
-		#os.chdir(UHD_utils.BIN_DIRECTORY)
+		os.chdir(UHD_utils.BIN_DIRECTORY)
 
 	"""
 	Uses the SDR in transmit mode.
