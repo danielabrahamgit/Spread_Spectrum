@@ -10,55 +10,62 @@ from utils.sig_utils import sig_utils
 from utils.SDR_utils import UHD_utils
 from utils.SSM_decoder import SSM_decoder
 
+# SA input arguments via argparse
+import argparse
 
-# ------------- INSERT PATH TO THE UHD FOLDER HERE -------------
-UHD_DIRECTORY = 'C:/Program Files (x86)/UHD'
-# --------------------------------------------------------------
+def main(argv):
+    parser = argparse.ArgumentParser(description="Transmit pure tone via IQ file")
+    parser.add_argument("-o", "--outdir", default="/scans",
+                        help="Output file directory to write file to ")
+    parser.add_argument("-g", "--gain", default=90,
+                        help="Transmit gain")
+    parser.add_argument("-f", "--freq", default=2.4e9,
+                        help="Center frequency (default 2.4e9)")
+    parser.add_argument("-r", "--rate", default=0.5e6,
+                        help="Transmit rate (default 0.5e6)")
+    parser.add_argument("-s", "--serial", default='3215B94',
+                        help="Serial number (default '3215B94')")
+    parser.add_argument("-i", "--id", default='scan',
+                        help="Sequence id for scan parameters")
 
-# --------------- CHANGE SEQUENCE PARAMTERS HERE ---------------
-seq_id = '/scans/cory_discovery.txt'
-center_freq = 127697458
-tx_rate = 250e3
-tx_gain = 5
-prnd_seq_len = 22000
-prnd_type = 'bern'
-prnd_mode = 'real'
-prnd_seed = 10
-# --------------------------------------------------------------
+    args = parser.parse_args()
 
-# Make instance of UHD_utils class
-uhd = UHD_utils(UHD_DIRECTORY)
+    # ------------- INSERT PATH TO THE UHD FOLDER HERE -------------
+    UHD_DIRECTORY = '/opt/local/share/uhd/examples/'
 
-# SSM iq_sig gen
-prnd_seq = sig_utils.prnd_gen(
-			seq_len=prnd_seq_len, 
-			type=prnd_type, 
-			mode=prnd_mode, 
-			seed=prnd_seed
-)
+    # Make instance of UHD_utils class
+    uhd = UHD_utils(UHD_DIRECTORY)
 
-# --------------- STANDARD PT CODE ---------------
-# Frequency offset from center_freq
-iq_sig_len = 25000
-f_offset = 100e3
-n = np.arange(iq_sig_len)
-iq_sig = np.exp(2j * np.pi * (f_offset) * n / tx_rate)
-# ------------------------------------------------
+    # --------------- STANDARD PT CODE ---------------
+    # Frequency offset from center_freq
+    iq_sig_len = 25000
+    f_offset = 100e3
+    ampl = 0.7
+    n = np.arange(iq_sig_len)
+    iq_sig = np.exp(2j * np.pi * (f_offset) * n / float(args.rate))
+    # ------------------------------------------------
 
-# N_repeats is the number of time the iq_sig will repeat 
-# when stored in the IQ file. 
-N_repeats = 20
-iq_sig = np.tile(iq_sig, N_repeats)
+    # N_repeats is the number of time the iq_sig will repeat 
+    # when stored in the IQ file. 
+    N_repeats = 500
+    iq_sig = np.tile(iq_sig, N_repeats)
 
-iq_sig = iq_sig / (np.max(np.abs(iq_sig)))
-iq_sig = iq_sig.astype(np.complex64)
+    iq_sig = ampl * iq_sig / (np.max(np.abs(iq_sig)))
+    iq_sig = iq_sig.astype(np.complex64)
 
-# Transmit iq signal infinitely
-uhd.uhd_write(
-	iq_sig=iq_sig,
-	freq=center_freq,
-	rate=tx_rate,
-	gain=tx_gain,
-	repeat=True,
-	arg='3215B94'
-)
+    uhd.save_sequence_params(args.id, args.freq, args.rate, args.gain)
+
+    uhd.uhd_write(
+        iq_sig=iq_sig,
+        freq=args.freq,
+        rate=args.rate,
+        gain=args.gain,
+        repeat=True,
+        arg=args.serial,
+        file=args.id + '.dat'
+        )
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
+
