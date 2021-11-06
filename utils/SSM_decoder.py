@@ -50,7 +50,7 @@ class SSM_decoder:
 			
 		return self.motion_estimate_ksp(ksp, mode=mode)
 
-	def motion_estimate_ksp(self, ksp, mode='RSSM'):		
+	def motion_estimate_ksp(self, ksp, mode='RSSM', show_peaks=False):		
 		# Number of phase encodes and readout length
 		if self.ro_dir == 'LR':
 			npe, ro_len = ksp.shape
@@ -71,7 +71,7 @@ class SSM_decoder:
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) ** 2, axis=0))
 				est = fft_ro[:,ind_pt]
 			else:
-				fft_ro = fftshift(np.fft.fft(ksp, axis=0, norm='forward'), axes=0)
+				fft_ro = fftshift(np.fft.fft(ksp, axis=0), axes=0)
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) / np.linalg.norm(fft_ro,axis=0) ** 2, axis=1))
 				est = fft_ro[ind_pt, :]
 			
@@ -104,8 +104,9 @@ class SSM_decoder:
 				# Motion extraction via circular correlation
 				cor = sig_utils.my_cor(self.prnd_seq, demod_sig)
 
-				plt.plot(np.abs(cor))
-				plt.show()
+				if show_peaks and i % 50 == 0:
+					plt.plot(np.abs(cor))
+					plt.show()
 
 				ind = np.argmax(np.abs(cor))
 				self.rnd_inds.append(ind)
@@ -114,14 +115,17 @@ class SSM_decoder:
 
 		return est
 
-	def motion_estimate_ksp_multi(self, ksp_frames, mode='RSSM'):
+	def motion_estimate_ksp_multi(self, ksp_frames, mode='RSSM', show_peaks=False):
 		# kx, ky, and frame number on third dimention
 		assert len(ksp_frames.shape) == 3
 
 		motion = None
 		for i in range(ksp_frames.shape[2]):
 			frame = ksp_frames[:,:,i]
-			est_frame_i = self.motion_estimate_ksp(frame, mode=mode)
+			if i == 0:
+				est_frame_i = self.motion_estimate_ksp(frame, mode=mode, show_peaks=show_peaks)
+			else:
+				est_frame_i = self.motion_estimate_ksp(frame, mode=mode, show_peaks=False)
 			if motion is None:
 				motion = est_frame_i
 			else:
@@ -156,7 +160,7 @@ class SSM_decoder:
 		B = np.sum(exps * sig_up * rnd.conj(), axis=1).flatten()
 		self.doppler_omega = omegas[np.argmax(np.abs(B))]
 
-		# self.doppler_omega = 2 * np.pi * (0.0) / self.PT_BW
+		self.doppler_omega = 2 * np.pi * (0.0) / self.PT_BW
 
 		print(f'Doppler Estimate = {self.doppler_omega * self.PT_BW / (2e3 * np.pi)} (kHz)')
 		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
