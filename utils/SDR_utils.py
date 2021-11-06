@@ -41,16 +41,22 @@ class UHD_utils:
 		UHD_utils.UHD_DIRECTORY = uhd_dir
 
 		# Important directories
-		UHD_utils.PY_DIR = os.getcwd().replace('\\', '/')
-		UHD_utils.BIN_DIRECTORY = UHD_utils.UHD_DIRECTORY + '/bin'
-		UHD_utils.EXEC_DIRECTORY = UHD_utils.UHD_DIRECTORY + '/lib/uhd/examples'
+		# UHD_utils.PY_DIR = os.getcwd().replace('\\', '/')
+		UHD_utils.PY_DIR = os.getcwd()
+
+		# SA Changed for Mac - everything is the same directory
+		# UHD_utils.BIN_DIRECTORY = UHD_utils.UHD_DIRECTORY + '/bin'
+		# UHD_utils.EXEC_DIRECTORY = UHD_utils.UHD_DIRECTORY + '/lib/uhd/examples'
+		UHD_utils.BIN_DIRECTORY = UHD_utils.UHD_DIRECTORY
+		UHD_utils.EXEC_DIRECTORY = UHD_utils.UHD_DIRECTORY
 
 		# Important files
 		UHD_utils.READ_SAMPLES = UHD_utils.EXEC_DIRECTORY + '/rx_samples_to_file'
 		UHD_utils.WRITE_SAMPLES = UHD_utils.EXEC_DIRECTORY + '/tx_samples_from_file'
 
+		# SA Remove for Mac
 		# Change to BIN Directory since it contains the .dll file
-		os.chdir(UHD_utils.BIN_DIRECTORY)
+		#os.chdir(UHD_utils.BIN_DIRECTORY)
 
 	"""
 	Uses the SDR in transmit mode.
@@ -65,7 +71,7 @@ class UHD_utils:
 		arg - serial number of USRP device
 		clk - external clock?
 	"""
-	def uhd_write(self, iq_sig, freq, rate=5e6, gain=10, bw=None, file='uhd_iq/write.dat', repeat=False, arg=None, clk=False):
+	def uhd_write(self, iq_sig, freq, rate=5e6, gain=10, bw=None, file='uhd_iq/write.dat', repeat=False, arg=None, clk=True):
 
 		# File to write from
 		file = UHD_utils.PY_DIR + '/' + file
@@ -97,8 +103,13 @@ class UHD_utils:
 		if clk:
 			cmd += ' --ref external'
 
+		# FOR DEBUGGING
+		print("cmd = {}".format(cmd))
+
 		# Now we execute the command and wait for temp_file to be populated
 		os.system(cmd)
+
+		# Write a logging file
 
 	"""
 	Uses the SDR in receive mode.
@@ -114,7 +125,7 @@ class UHD_utils:
 	Returns:
 		iq_sig - array of complex numbers, <complex nparray>
 	"""
-	def uhd_read(self, freq, rate=5e6, gain=10, duration=1, file='uhd_iq/read.dat', arg=None, use_sdr=True, clk=False):
+	def uhd_read(self, freq, rate=5e6, gain=10, duration=1, file='uhd_iq/read.dat', arg=None, use_sdr=True, clk=True):
 
 		# file to read samples into
 		file = UHD_utils.PY_DIR + '/' + file
@@ -149,3 +160,23 @@ class UHD_utils:
 
 		iq_sig = np.array(I) + 1j * np.array(Q)
 		return iq_sig.flatten()
+
+	"""
+		Helper function to store sequence parameters into a file
+	"""
+	def save_sequence_params(self, seq_id, center_freq, tx_rate, tx_gain):
+		print("Writing file....")
+		seq_data = {}
+		seq_data['center_freq'] = center_freq
+		seq_data['tx_rate'] = tx_rate
+		seq_data['tx_gain'] = tx_gain
+
+		s = ''
+		for key in seq_data.keys():
+			s += key + ': '
+			s += str(seq_data[key])
+			s += '\n\n'
+		# with open(self.PY_DIR +  seq_id + '.txt', 'w') as f:
+		with open(seq_id + '.txt', 'w') as f:
+			f.write(s)
+		f.close()
