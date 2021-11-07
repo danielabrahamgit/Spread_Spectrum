@@ -170,7 +170,7 @@ class SSM_decoder:
 		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
 
 
-	def peak_removal(self, ksp, est, thresh=20, deg=4):
+	def peak_removal(self, ksp, est, deg=10, verbose=False):
 		assert len(ksp.shape) == 2
 		if self.ro_dir == 'LR':
 			stds = np.std(ksp, axis=1).flatten()
@@ -179,25 +179,32 @@ class SSM_decoder:
 		
 		assert len(stds) == len(est)
 
-		# plt.subplot(311)
-		# plt.plot(stds)
 
+		new_est = est.copy()
 		mid = len(est) // 2
+		
+		kind_avg = (np.mean(stds[:mid-50]) + np.mean(stds[mid+50:]))/2
+		thresh = kind_avg * 1.3
 		n = np.arange(len(est)) - mid
-		
-		# plt.subplot(312)
-		# plt.plot(est)
-		
 		corrupt = np.where(stds > thresh)[0]
 		not_corrupt = np.where(stds <= thresh)[0]
+		if len(not_corrupt) == 0:
+			return est * 0
 		coeff = np.polyfit(not_corrupt - mid, est[not_corrupt], deg)
 		p = np.poly1d(coeff)
-		est[corrupt] = p(corrupt - mid)
+		new_est[corrupt] = p(corrupt - mid)
 
-		# plt.subplot(313)
-		# plt.plot(est)
-		# plt.plot(p(n))
-		# plt.show()
+		if verbose:
+			print(thresh)
+			plt.subplot(311)
+			plt.plot(stds)
+			plt.subplot(312)
+			plt.plot(est)	
+			plt.subplot(313)
+			plt.plot(new_est)
+			plt.plot(p(n))
+			plt.show()
+		return new_est
 
 
 
