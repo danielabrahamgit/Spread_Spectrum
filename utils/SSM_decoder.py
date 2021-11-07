@@ -1,5 +1,6 @@
 import sys
 import os
+from numpy.core.numeric import correlate
 
 import scipy
 sys.path.append(os.path.abspath('../'))
@@ -104,6 +105,9 @@ class SSM_decoder:
 				rnd = np.roll(self.prnd_seq, -ind)[:N]
 				est[i] = np.sum(demod_sig * rnd.conj()) / N
 
+				remove = sig_up - est[i] * rnd
+				cor = sig_utils.my_cor(rnd, remove)
+
 				ro_est = signal.resample_poly(sig_up -  est[i] * rnd, ro_len, N)
 
 				if self.ro_dir == 'LR':
@@ -165,10 +169,36 @@ class SSM_decoder:
 		print(f'Doppler Estimate = {self.doppler_omega * self.pt_bw / (2e3 * np.pi)} (kHz)')
 		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
 
-if __name__ == '__main__':
-	if len(sys.argv) == 2:
-		filename = sys.argv[1]
-	else:
-		print('Expecting at kspace input file as argument')
 
-	
+	def peak_removal(self, ksp, est, thresh=20, deg=4):
+		assert len(ksp.shape) == 2
+		if self.ro_dir == 'LR':
+			stds = np.std(ksp, axis=1).flatten()
+		else:
+			stds = np.std(ksp, axis=0).flatten()
+		
+		assert len(stds) == len(est)
+
+		# plt.subplot(311)
+		# plt.plot(stds)
+
+		mid = len(est) // 2
+		n = np.arange(len(est)) - mid
+		
+		# plt.subplot(312)
+		# plt.plot(est)
+		
+		corrupt = np.where(stds > thresh)[0]
+		not_corrupt = np.where(stds <= thresh)[0]
+		coeff = np.polyfit(not_corrupt - mid, est[not_corrupt], deg)
+		p = np.poly1d(coeff)
+		est[corrupt] = p(corrupt - mid)
+
+		# plt.subplot(313)
+		# plt.plot(est)
+		# plt.plot(p(n))
+		# plt.show()
+
+
+
+
