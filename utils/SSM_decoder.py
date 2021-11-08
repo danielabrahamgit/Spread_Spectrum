@@ -105,10 +105,17 @@ class SSM_decoder:
 				rnd = np.roll(self.prnd_seq, -ind)[:N]
 				est[i] = np.sum(demod_sig * rnd.conj()) / N
 
-				remove = sig_up - est[i] * rnd
-				cor = sig_utils.my_cor(rnd, remove)
+				remove = demod_sig -  est[i] * rnd					
 
-				ro_est = signal.resample_poly(sig_up -  est[i] * rnd, ro_len, N)
+				if i == -1:
+					remove_cor = sig_utils.my_cor(remove, self.prnd_seq)
+					plt.subplot(211)
+					plt.plot(np.abs(cor))
+					plt.subplot(212)
+					plt.plot(np.abs(remove_cor))
+					plt.show()
+
+				ro_est = signal.resample_poly(remove, ro_len, N)
 
 				if self.ro_dir == 'LR':
 					ksp_est[i, :] = ro_est
@@ -164,7 +171,7 @@ class SSM_decoder:
 		B = np.sum(exps * sig_up * rnd.conj(), axis=1).flatten()
 		self.doppler_omega = omegas[np.argmax(np.abs(B))]
 
-		# self.doppler_omega = 2 * np.pi * (0.0) / self.pt_bw
+		self.doppler_omega = 2 * np.pi * (0.0) / self.pt_bw
 
 		print(f'Doppler Estimate = {self.doppler_omega * self.pt_bw / (2e3 * np.pi)} (kHz)')
 		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
