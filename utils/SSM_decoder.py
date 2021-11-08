@@ -16,7 +16,7 @@ from scipy import signal
 
 class SSM_decoder:
 
-	def __init__(self, prnd_seq, ksp, mr_bw, pt_bw=250e3, pt_fc=0, doppler_range=None, ro_dir='LR'):
+	def __init__(self, prnd_seq, ksp, mr_bw, pt_bw=250e3, pt_fc=0, doppler_range=None, ro_dir='LR', iter_removal=False):
 		# Save MR/PT bandwidth for future computation
 		self.mr_bw = mr_bw
 		self.pt_bw = pt_bw
@@ -35,6 +35,10 @@ class SSM_decoder:
 
 		self.ksp = ksp
 		self.corrected_ksp = np.zeros_like(ksp)
+
+		self.iter_removal = iter_removal
+
+		self.ind_jump = None
 
 	def motion_estimate_iq(self, iq_sig, mode='RSSM', chop=20):
 		N = len(iq_sig)
@@ -68,7 +72,7 @@ class SSM_decoder:
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) ** 2, axis=0))
 				est = fft_ro[:,ind_pt]
 			else:
-				fft_ro = fftshift(np.fft.fft(ksp, axis=0, norm='forward'), axes=0)
+				fft_ro = fftshift(np.fft.fft(ksp, axis=0), axes=0)
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) / np.linalg.norm(fft_ro,axis=0) ** 2, axis=1))
 				est = fft_ro[ind_pt, :]
 			
@@ -81,6 +85,11 @@ class SSM_decoder:
 			# Possible random sequences 
 			if len(self.prnd_seq) < N:
 				self.prnd_seq = np.tile(self.prnd_seq, int(np.ceil(N / len(self.prnd_seq))))
+
+			ind_jumps=[]
+			ind_jump = None
+			Nr = len(self.prnd_seq)
+			seq_so_far = None
 
 			# Go through each readout
 			for i in range(npe):
@@ -98,17 +107,41 @@ class SSM_decoder:
 				
 				demod_sig = sig_up * self.doppler_exp
 
-				# Motion extraction via circular correlation
-				cor = sig_utils.my_cor(self.prnd_seq, demod_sig)
+				
+				if ind_jump is None:
+					# Motion extraction via circular correlation
+					cor = sig_utils.my_cor(self.prnd_seq, demod_sig)
+					ind = np.argmax(np.abs(cor))
+					if i < 5:
+						ind_jumps.append(ind)
+					else:
+						diffs = np.diff(ind_jumps)
+						am = np.argmin(diffs)
+						diffs[am] = diffs[(am + 1) % len(diffs)]
+						ind_jump = int(np.mean(diffs))
+						print(ind_jump)
+					rnd = np.roll(self.prnd_seq, -ind)[:N]
+					est[i] = np.sum(demod_sig * rnd.conj()) / N
+				else:
+					ind = (ind + ind_jump) % Nr
+					rnds = np.array([np.roll(self.prnd_seq, -ind+i)[:N] for i in range(-3,4)])
+					cors = np.sum(rnds * demod_sig, axis=1).flatten()
+					argm = np.argmax(np.abs(cors))
+					rnd = rnds[argm]
+					ind = (ind - (argm - 3)) % Nr
+					est[i] = cors[argm] / N
 
-				ind = np.argmax(np.abs(cor))
-				rnd = np.roll(self.prnd_seq, -ind)[:N]
-				est[i] = np.sum(demod_sig * rnd.conj()) / N
+				remove = demod_sig - est[i] * rnd
 
-				remove = sig_up - est[i] * rnd
-				cor = sig_utils.my_cor(rnd, remove)
+				for _ in range(3):
+					rnds = np.array([np.roll(self.prnd_seq, -ind+i)[:N] for i in range(-3,4)])
+					cors = np.sum(rnds * remove, axis=1).flatten()
+					argm = np.argmax(np.abs(cors))
+					ind = (ind - (argm - 3)) % Nr
+					rnd = rnds[argm]
+					remove = remove - cors[argm] * rnd / N 
 
-				ro_est = signal.resample_poly(sig_up -  est[i] * rnd, ro_len, N)
+				ro_est = signal.resample_poly(remove, ro_len, N)
 
 				if self.ro_dir == 'LR':
 					ksp_est[i, :] = ro_est
