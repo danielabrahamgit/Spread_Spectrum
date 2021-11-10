@@ -1,3 +1,4 @@
+from operator import pos
 import sys
 import os
 from numpy.core.numeric import correlate
@@ -16,11 +17,12 @@ from scipy import signal
 
 class SSM_decoder:
 
-	def __init__(self, prnd_seq, ksp, mr_bw, pt_bw=250e3, pt_fc=0, doppler_range=None, ro_dir='LR', iter_removal=False):
+	def __init__(self, prnd_seq, ksp, mr_bw, tr, pt_bw=250e3, pt_fc=0, doppler_range=None, ro_dir='LR', iter_removal=False):
 		# Save MR/PT bandwidth for future computation
 		self.mr_bw = mr_bw
 		self.pt_bw = pt_bw
 		self.pt_fc = pt_fc
+		self.tr_samps = int(tr * pt_bw)
 
 		# Pseudo random number sequence
 		self.prnd_seq = prnd_seq
@@ -39,6 +41,8 @@ class SSM_decoder:
 		self.iter_removal = iter_removal
 
 		self.ind_jump = None
+		if self.mr_bw < self.pt_bw:
+			self.hlp = signal.firwin(200, self.mr_bw/self.pt_bw, fs=2)
 
 	def motion_estimate_iq(self, iq_sig, mode='RSSM', chop=20):
 		N = len(iq_sig)
@@ -48,7 +52,7 @@ class SSM_decoder:
 			
 		return self.motion_estimate_ksp(ksp, mode=mode)
 
-	def motion_estimate_ksp(self, ksp, mode='RSSM'):		
+	def motion_estimate_ksp(self, ksp, mode='RSSM', std_remove=1, sample_slack=20):		
 		# Number of phase encodes and readout length
 		if self.ro_dir == 'LR':
 			npe, ro_len = ksp.shape
@@ -57,6 +61,9 @@ class SSM_decoder:
 
 		# number of PT samples in a readout
 		N = int(ro_len * self.pt_bw / self.mr_bw)
+
+		# Number of points in random sequence
+		Nr = len(self.prnd_seq)
 
 		# Motion estimate to return
 		est = np.zeros(npe, dtype=np.complex128)
@@ -75,22 +82,24 @@ class SSM_decoder:
 				fft_ro = fftshift(np.fft.fft(ksp, axis=0), axes=0)
 				ind_pt = np.argmax(np.sum(np.abs(fft_ro) / np.linalg.norm(fft_ro,axis=0) ** 2, axis=1))
 				est = fft_ro[ind_pt, :]
-			
-			# print(ind_pt)
-
-			# plt.imshow(np.abs(fft_ro))
-			# plt.show()
 		# Robust SSM procedure
 		elif mode == 'RSSM':
 			# Possible random sequences 
 			if len(self.prnd_seq) < N:
 				self.prnd_seq = np.tile(self.prnd_seq, int(np.ceil(N / len(self.prnd_seq))))
 
-			ind_jumps=[]
-			ind_jump = None
-			Nr = len(self.prnd_seq)
-			seq_so_far = None
-
+			if self.ro_dir == 'LR':
+				stds = np.std(ksp, axis=1).flatten()
+			else:
+				stds = np.std(ksp, axis=0).flatten()
+			
+			ind = 0
+			mean = np.mean(stds)
+			sigma = np.std(stds)
+			end_zone = -1
+			bad_rnds = {}
+			bad_inds = []
+			
 			# Go through each readout
 			for i in range(npe):
 				if self.ro_dir == 'LR':
@@ -98,6 +107,11 @@ class SSM_decoder:
 				else:
 					ro = ksp[:, i]
 
+				if np.abs(np.std(ro) - mean) > std_remove * sigma:
+					end_zone = i + 1
+				if i == 256:
+					print(np.abs(np.std(ro) - mean), std_remove * sigma, end_zone)
+				
 				# Upsample readout to PT sample rate				
 				sig_up = signal.resample_poly(ro, N, ro_len)
 				
@@ -107,50 +121,70 @@ class SSM_decoder:
 				
 				demod_sig = sig_up * self.doppler_exp
 
-				
-				if ind_jump is None:
-					# Motion extraction via circular correlation
+				# Full synchronization every 64 readouts
+				if  i % 64 == 0 or i == end_zone + 1:
 					cor = sig_utils.my_cor(self.prnd_seq, demod_sig)
 					ind = np.argmax(np.abs(cor))
-					if i < 5:
-						ind_jumps.append(ind)
-					else:
-						diffs = np.diff(ind_jumps)
-						am = np.argmin(diffs)
-						diffs[am] = diffs[(am + 1) % len(diffs)]
-						ind_jump = int(np.mean(diffs))
-						print(ind_jump)
 					rnd = np.roll(self.prnd_seq, -ind)[:N]
+				# Otherwise just look in a much smaller ballpark
+				else:
+					ind_expected = (ind + self.tr_samps) % Nr
+					ind_low = (ind_expected - sample_slack) % Nr
+					ind_high = ind_low + N + 2 * sample_slack + 1
+					# print(ind_low, ind_high)
+					possible_seqs = self.prnd_seq.take(range(ind_low, ind_high), mode='wrap')
+					small_cor = np.abs(np.correlate(possible_seqs, demod_sig, mode='valid'))
+					# small_cor = np.abs(sig_utils.my_cor(possible_seqs, demod_sig))
+					ind_best = np.argmax(small_cor)
+					ind = (ind_expected + ind_best -  sample_slack) % Nr
+					rnd = possible_seqs[ind_best:ind_best+N]
+
+				if i > end_zone:
 					est[i] = np.sum(demod_sig * rnd.conj()) / N
+					# MAYBE NOT CONJ()?
+					A = np.abs(est[i])
+					r = rnd
+					exp = self.doppler_exp
+					emulated_pt_sig = self.emulate_pt_acquisition(A, r, exp)
+					remove = sig_up - emulated_pt_sig
+					ro_est = signal.resample_poly(remove, ro_len, N)
+					if self.ro_dir == 'LR':
+						ksp_est[i, :] = ro_est
+					else:
+						ksp_est[:, i] = ro_est
 				else:
-					ind = (ind + ind_jump) % Nr
-					rnds = np.array([np.roll(self.prnd_seq, -ind+i)[:N] for i in range(-3,4)])
-					cors = np.sum(rnds * demod_sig, axis=1).flatten()
-					argm = np.argmax(np.abs(cors))
-					rnd = rnds[argm]
-					ind = (ind - (argm - 3)) % Nr
-					est[i] = cors[argm] / N
+					cor = sig_utils.my_cor(self.prnd_seq, demod_sig)
+					ind = np.argmax(np.abs(cor))
+					rnd = np.roll(self.prnd_seq, -ind)[:N]
+					bad_inds.append(i)
+					bad_rnds[i] = rnd.copy()
 
-				remove = demod_sig - est[i] * rnd
-
-				for _ in range(3):
-					rnds = np.array([np.roll(self.prnd_seq, -ind+i)[:N] for i in range(-3,4)])
-					cors = np.sum(rnds * remove, axis=1).flatten()
-					argm = np.argmax(np.abs(cors))
-					ind = (ind - (argm - 3)) % Nr
-					rnd = rnds[argm]
-					remove = remove - cors[argm] * rnd / N 
-
-				ro_est = signal.resample_poly(remove, ro_len, N)
-
-				if self.ro_dir == 'LR':
-					ksp_est[i, :] = ro_est
-				else:
-					ksp_est[:, i] = ro_est
-
+			if len(bad_inds) > 0:
+				t = np.arange(0, 512) * 10e-3
+				new_est = self.peak_removal(est, np.array(bad_inds), deg=10)
+				bad_inds = np.array(bad_inds)
+				est[bad_inds] = new_est
+				for bad_ind in bad_inds:
+					if self.ro_dir == 'LR':
+						ro = ksp[bad_ind, :]
+					else:
+						ro = ksp[:, bad_ind]
+					# Upsample readout to PT sample rate				
+					sig_up = signal.resample_poly(ro, N, ro_len)
+					# MAYBE NOT CONJ()?
+					A = np.abs(est[bad_ind])
+					r = bad_rnds[bad_ind] 
+					exp = self.doppler_exp
+					emulated_pt_sig = self.emulate_pt_acquisition(A, r, exp)
+					remove = sig_up - emulated_pt_sig
+					ro_est = signal.resample_poly(remove, ro_len, N)
+					if self.ro_dir == 'LR':
+						ksp_est[bad_ind, :] = ro_est
+					else:
+						ksp_est[:, bad_ind] = ro_est
 		return est, ksp_est
 
-	def motion_estimate(self, mode='RSSM'):
+	def motion_estimate(self, mode='RSSM', std_remove=1, sample_slack=20):
 		# kx, ky, and frame number on third dimention
 		assert len(self.ksp.shape) >= 2
 		ksp_est = np.zeros_like(self.ksp)
@@ -159,14 +193,14 @@ class SSM_decoder:
 			ksp_frames = self.ksp
 			for i in range(ksp_frames.shape[2]):
 				frame = ksp_frames[:,:,i]
-				est_frame_i, ksp_est_i = self.motion_estimate_ksp(frame, mode=mode)
+				est_frame_i, ksp_est_i = self.motion_estimate_ksp(frame, mode=mode, std_remove=std_remove, sample_slack=sample_slack)
 				if motion is None:
 					motion = est_frame_i
 				else:
 					motion = np.concatenate((motion, est_frame_i))
 				ksp_est[:,:,i] = ksp_est_i
 		else:
-			motion, ksp_est = self.motion_estimate_ksp(self.ksp, mode=mode)
+			motion, ksp_est = self.motion_estimate_ksp(self.ksp, mode=mode, std_remove=std_remove, sample_slack=sample_slack)
 		
 		return motion, ksp_est
 
@@ -197,47 +231,36 @@ class SSM_decoder:
 		B = np.sum(exps * sig_up * rnd.conj(), axis=1).flatten()
 		self.doppler_omega = omegas[np.argmax(np.abs(B))]
 
-		self.doppler_omega = 2 * np.pi * (0.0) / self.pt_bw
+		# self.doppler_omega = 2 * np.pi * (0.0) / self.pt_bw
 
 		print(f'Doppler Estimate = {self.doppler_omega * self.pt_bw / (2e3 * np.pi)} (kHz)')
-		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))
+		self.doppler_exp = np.exp(-1j * self.doppler_omega * np.arange(N))\
 
-
-	def peak_removal(self, ksp, est, deg=10, verbose=False):
-		assert len(ksp.shape) == 2
-		if self.ro_dir == 'LR':
-			stds = np.std(ksp, axis=1).flatten()
-		else:
-			stds = np.std(ksp, axis=0).flatten()
-		
-		assert len(stds) == len(est)
-
-
-		new_est = est.copy()
-		mid = len(est) // 2
-		
-		kind_avg = (np.mean(stds[:mid-50]) + np.mean(stds[mid+50:]))/2
-		thresh = kind_avg * 1.3
-		n = np.arange(len(est)) - mid
-		corrupt = np.where(stds > thresh)[0]
-		not_corrupt = np.where(stds <= thresh)[0]
-		if len(not_corrupt) == 0:
+	def peak_removal(self, est, bad_inds, deg=10, verbose=False):
+		mid = len(est)//2
+		n = np.arange(len(est))
+		good_ind = np.array([i for i in range(len(est)) if i not in bad_inds])
+		if len(good_ind) == 0:
 			return est * 0
-		coeff = np.polyfit(not_corrupt - mid, est[not_corrupt], deg)
+		coeff = np.polyfit(good_ind - mid, est[good_ind], deg)
 		p = np.poly1d(coeff)
-		new_est[corrupt] = p(corrupt - mid)
+		# new_est[corrupt] = p(corrupt - mid)
 
-		if verbose:
-			print(thresh)
-			plt.subplot(311)
-			plt.plot(stds)
-			plt.subplot(312)
-			plt.plot(est)	
-			plt.subplot(313)
-			plt.plot(new_est)
-			plt.plot(p(n))
-			plt.show()
-		return new_est
+		# if verbose:
+		# 	plt.subplot(211)
+		# 	plt.plot(est)	
+		# 	plt.subplot(212)
+		# 	plt.plot(new_est)
+		# 	plt.plot(p(np.arange(len(est)) - mid))
+		# 	plt.show()
+		return p(bad_inds - mid)
+
+	def emulate_pt_acquisition(self, A, r, exp):
+		pt = A * r * exp 
+		if self.mr_bw < self.pt_bw:
+			pt = np.convolve(pt, self.hlp, mode='same')
+		return pt
+			
 
 
 
